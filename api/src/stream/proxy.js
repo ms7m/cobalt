@@ -3,6 +3,7 @@ import { create as contentDisposition } from "content-disposition-header";
 
 import { destroyInternalStream } from "./manage.js";
 import { getHeaders, closeRequest, closeResponse, pipe } from "./shared.js";
+import { createArchiveTee } from "../archive/writer.js";
 
 const defaultAgent = new Agent();
 
@@ -36,7 +37,9 @@ export default async function (streamInfo, res) {
             }
         }
 
-        pipe(stream, res, shutdown);
+        // Create a tee stream that archives to NAS while sending to client
+        const teeStream = createArchiveTee(streamInfo.service, streamInfo.filename, stream);
+        pipe(teeStream, res, shutdown);
     } catch {
         shutdown();
     }

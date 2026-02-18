@@ -86,11 +86,9 @@ const migrations: Record<number, Migrator> = {
         const out = settings as RecursivePartial<CobaltSettingsV6>;
         out.schemaVersion = 6;
 
-        if (settings?.save) {
-            if ("localProcessing" in settings.save) {
-                out.save!.localProcessing =
-                    settings.save.localProcessing ? "preferred" : "disabled";
-            }
+        // Remove localProcessing from save settings if present
+        if (settings?.save && "localProcessing" in settings.save) {
+            delete settings.save.localProcessing;
         }
 
         return out as AllPartialSettingsWithSchema;

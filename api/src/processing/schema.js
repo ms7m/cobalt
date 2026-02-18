@@ -34,10 +34,6 @@ export const apiSchema = z.object({
         ["max", "4320", "2160", "1440", "1080", "720", "480", "360", "240", "144"]
     ).default("1080"),
 
-    localProcessing: z.enum(
-        ["disabled", "preferred", "forced"]
-    ).default("disabled"),
-
     youtubeDubLang: z.string()
                      .min(2)
                      .max(8)

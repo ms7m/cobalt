@@ -5,7 +5,6 @@ enum CobaltResponseType {
     Picker = 'picker',
     Redirect = 'redirect',
     Tunnel = 'tunnel',
-    LocalProcessing = 'local-processing',
 }
 
 export type CobaltErrorResponse = {
@@ -60,33 +59,6 @@ export type CobaltFileMetadata = Record<
     typeof CobaltFileMetadataKeys[number], string | undefined
 >;
 
-export type CobaltLocalProcessingType = 'merge' | 'mute' | 'audio' | 'gif' | 'remux' | 'proxy';
-
-export type CobaltLocalProcessingResponse = {
-    status: CobaltResponseType.LocalProcessing,
-
-    type: CobaltLocalProcessingType,
-    service: string,
-    tunnel: string[],
-
-    output: {
-        type: string, // mimetype
-        filename: string,
-        metadata?: CobaltFileMetadata,
-        subtitles?: boolean,
-    },
-
-    audio?: {
-        copy: boolean,
-        format: string,
-        bitrate: string,
-        cover?: boolean,
-        cropCover?: boolean,
-    },
-
-    isHLS?: boolean,
-}
-
 export type CobaltFileUrlType = "redirect" | "tunnel";
 
 export type CobaltSession = {
@@ -121,5 +93,4 @@ export type CobaltServerInfoResponse = CobaltServerInfo | CobaltErrorResponse;
 export type CobaltAPIResponse = CobaltErrorResponse
                               | CobaltPickerResponse
                               | CobaltRedirectResponse
-                              | CobaltTunnelResponse
-                              | CobaltLocalProcessingResponse;
+                              | CobaltTunnelResponse;

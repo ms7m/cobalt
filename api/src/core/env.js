@@ -7,7 +7,6 @@ import { isURL } from "../misc/utils.js";
 import * as cluster from "../misc/cluster.js";
 import { Green, Yellow } from "../misc/console-text.js";
 
-const forceLocalProcessingOptions = ["never", "session", "always"];
 const youtubeHlsOptions = ["never", "key", "always"];
 
 const httpProxyVariables = ["NO_PROXY", "HTTP_PROXY", "HTTPS_PROXY"].flatMap(
@@ -122,11 +121,11 @@ export const loadEnvs = (env = process.env) => {
         ytSessionInnertubeClient: env.YOUTUBE_SESSION_INNERTUBE_CLIENT,
         ytAllowBetterAudio: env.YOUTUBE_ALLOW_BETTER_AUDIO !== "0",
 
-        // "never" | "session" | "always"
-        forceLocalProcessing: env.FORCE_LOCAL_PROCESSING ?? "never",
-
         // "never" | "key" | "always"
         enableDeprecatedYoutubeHls: env.ENABLE_DEPRECATED_YOUTUBE_HLS ?? "never",
+
+        // NAS archival configuration
+        mediaArchiveRoot: env.MEDIA_ARCHIVE_ROOT || '',
 
         envFile: env.API_ENV_FILE,
         envRemoteReloadInterval: 300,
@@ -156,12 +155,6 @@ export const validateEnvs = async (env) => {
         console.error("CUSTOM_INNERTUBE_CLIENT is invalid. Provided client is not supported.");
         console.error(`Supported clients are: ${Constants.SUPPORTED_CLIENTS.join(', ')}\n`);
         throw new Error("Invalid CUSTOM_INNERTUBE_CLIENT");
-    }
-
-    if (env.forceLocalProcessing && !forceLocalProcessingOptions.includes(env.forceLocalProcessing)) {
-        console.error("FORCE_LOCAL_PROCESSING is invalid.");
-        console.error(`Supported options are are: ${forceLocalProcessingOptions.join(', ')}\n`);
-        throw new Error("Invalid FORCE_LOCAL_PROCESSING");
     }
 
     if (env.enableDeprecatedYoutubeHls && !youtubeHlsOptions.includes(env.enableDeprecatedYoutubeHls)) {

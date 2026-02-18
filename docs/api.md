@@ -78,7 +78,6 @@ all keys except for `url` are optional. value options are separated by `/`.
 | `videoQuality`    | `string`  | `max / 4320 / 2160 / 1440 / 1080 / 720 / 480 / 360 / 240 / 144` | `1080`     |
 | `disableMetadata` | `boolean` | title, artist, and other info will not be added to the file     | `false`    |
 | `alwaysProxy`     | `boolean` | always tunnel all files, even when not necessary                | `false`    |
-| `localProcessing` | `string`  | `disabled / preferred / forced`                                 | `disabled` |
 | `subtitleLang`    | `string`  | any valid ISO 639-1 language code                               | *none*     |
 
 #### service-specific options
@@ -98,7 +97,6 @@ body type: `application/json`
 
 the response will always be a JSON object containing the `status` key, which is one of:
 - `tunnel`: cobalt is proxying and/or remuxing/transcoding the file for you.
-- `local-processing`: cobalt is proxying the files for you, but you have to remux/transcode them locally.
 - `redirect`: cobalt will redirect you to the direct service URL.
 - `picker`: there are multiple items to choose from, a picker should be shown.
 - `error`: something went wrong, here's an error code.
@@ -109,50 +107,6 @@ the response will always be a JSON object containing the `status` key, which is 
 | `status`     | `string` | `tunnel / redirect`                                        |
 | `url`        | `string` | url for the cobalt tunnel, or redirect to an external link |
 | `filename`   | `string` | cobalt-generated filename for the file being downloaded    |
-
-### local processing response
-| key          | type       | value                                                         |
-|:-------------|:-----------|:--------------------------------------------------------------|
-| `status`     | `string`   | `local-processing`                                            |
-| `type`       | `string`   | `merge`, `mute`, `audio`, `gif`, or `remux`                   |
-| `service`    | `string`   | origin service (`youtube`, `twitter`, `instagram`, etc)       |
-| `tunnel`     | `string[]` | array of tunnel URLs                                          |
-| `output`     | `object`   | details about the output file ([see below](#output-object))   |
-| `audio`      | `object`   | audio-specific details (optional, [see below](#audio-object)) |
-| `isHLS`      | `boolean`  | whether the output is in HLS format (optional)                |
-
-#### output object
-| key         | type      | value                                                                             |
-|:------------|:----------|:----------------------------------------------------------------------------------|
-| `type`      | `string`  | mime type of the output file                                                      |
-| `filename`  | `string`  | filename of the output file                                                       |
-| `metadata`  | `object`  | metadata associated with the file (optional, [see below](#outputmetadata-object)) |
-| `subtitles` | `boolean` | whether tunnels include a subtitle file                                           |
-
-#### output.metadata object
-all keys in this table are optional.
-
-| key            | type     | description                                |
-|:---------------|:---------|:-------------------------------------------|
-| `album`        | `string` | album name or collection title             |
-| `composer`     | `string` | composer of the track                      |
-| `genre`        | `string` | track's genre(s)                           |
-| `copyright`    | `string` | copyright information or ownership details |
-| `title`        | `string` | title of the track or media file           |
-| `artist`       | `string` | artist or creator name                     |
-| `album_artist` | `string` | album's artist or creator name             |
-| `track`        | `string` | track number or position in album          |
-| `date`         | `string` | release date or creation date              |
-| `sublanguage`  | `string` | subtitle language code (ISO 639-2)         |
-
-#### audio object
-| key         | type      | value                                                      |
-|:------------|:----------|:-----------------------------------------------------------|
-| `copy`      | `boolean` | defines whether audio codec data is copied                 |
-| `format`    | `string`  | output audio format                                        |
-| `bitrate`   | `string`  | preferred bitrate of audio format                          |
-| `cover`     | `boolean` | whether tunnels include a cover art file (optional)        |
-| `cropCover` | `boolean` | whether cover art should be cropped to a square (optional) |
 
 ### picker response
 | key             | type     | value                                                                                          |

@@ -6,6 +6,7 @@ import { env } from "../config.js";
 import { destroyInternalStream } from "./manage.js";
 import { hlsExceptions } from "../processing/service-config.js";
 import { closeResponse, pipe, estimateTunnelLength, estimateAudioMultiplier } from "./shared.js";
+import { archiveFFmpegOutput } from "../archive/writer.js";
 
 const metadataTags = new Set([
     "album",
@@ -57,6 +58,8 @@ const getCommand = (args) => {
 const render = async (res, streamInfo, ffargs, estimateMultiplier) => {
     let process;
     const urls = Array.isArray(streamInfo.urls) ? streamInfo.urls : [streamInfo.urls];
+    const archiveWriter = archiveFFmpegOutput(streamInfo.service, streamInfo.filename);
+    
     const shutdown = () => (
         killProcess(process),
         closeResponse(res),
@@ -79,6 +82,8 @@ const render = async (res, streamInfo, ffargs, estimateMultiplier) => {
 
         const [,,, muxOutput] = process.stdio;
 
+        await archiveWriter.initialize();
+
         res.setHeader('Connection', 'keep-alive');
         res.setHeader('Content-Disposition', contentDisposition(streamInfo.filename));
 
@@ -87,11 +92,30 @@ const render = async (res, streamInfo, ffargs, estimateMultiplier) => {
             await estimateTunnelLength(streamInfo, estimateMultiplier)
         );
 
-        pipe(muxOutput, res, shutdown);
+        // Create a custom pipe that writes to both response and archive
+        const customPipe = (from, to, done, writer) => {
+            from.on('data', (chunk) => {
+                writer.write(chunk);
+            });
+            
+            from.on('error', done)
+                .on('close', async () => {
+                    await writer.finalize();
+                    done();
+                });
+
+            to.on('error', done)
+              .on('close', done);
+
+            from.pipe(to);
+        };
+
+        customPipe(muxOutput, res, shutdown, archiveWriter);
 
         process.on('close', shutdown);
         res.on('finish', shutdown);
     } catch {
+        await archiveWriter.abort();
         shutdown();
     }
 }

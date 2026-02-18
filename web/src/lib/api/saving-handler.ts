@@ -8,7 +8,6 @@ import { t } from "$lib/i18n/translations";
 import { downloadFile } from "$lib/download";
 import { createDialog } from "$lib/state/dialogs";
 import { downloadButtonState } from "$lib/state/omnibox";
-import { createSavePipeline } from "$lib/task-manager/queue";
 
 import type { CobaltSaveRequestBody } from "$lib/types/api";
 
@@ -43,9 +42,6 @@ export const savingHandler = async ({ url, request, oldTaskId }: SavingHandlerAr
 
     const selectedRequest = request || {
         url: url!,
-
-        // not lazy cuz default depends on device capabilities
-        localProcessing: get(settings).save.localProcessing,
 
         alwaysProxy: getSetting("save", "alwaysProxy"),
         downloadMode: getSetting("save", "downloadMode"),
@@ -108,11 +104,6 @@ export const savingHandler = async ({ url, request, oldTaskId }: SavingHandlerAr
             downloadButtonState.set("error");
             return error(get(t)("error.tunnel.probe"));
         }
-    }
-
-    if (response.status === "local-processing") {
-        downloadButtonState.set("done");
-        return createSavePipeline(response, selectedRequest, oldTaskId);
     }
 
     if (response.status === "picker") {

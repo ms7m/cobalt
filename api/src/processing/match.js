@@ -319,15 +319,6 @@ export default async function({ host, patternMatch, params, authType }) {
             })
         }
 
-        let localProcessing = params.localProcessing;
-        const lpEnv = env.forceLocalProcessing;
-        const shouldForceLocal = lpEnv === "always" || (lpEnv === "session" && authType === "session");
-        const localDisabled = (!localProcessing || localProcessing === "disabled");
-
-        if (shouldForceLocal && localDisabled) {
-            localProcessing = "preferred";
-        }
-
         return matchAction({
             r,
             host,
@@ -339,8 +330,7 @@ export default async function({ host, patternMatch, params, authType }) {
             convertGif: params.convertGif,
             requestIP,
             audioBitrate: params.audioBitrate,
-            alwaysProxy: params.alwaysProxy || localProcessing === "forced",
-            localProcessing,
+            alwaysProxy: params.alwaysProxy,
         })
     } catch {
         return createResponse("error", {

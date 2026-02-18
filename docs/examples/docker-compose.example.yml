@@ -22,6 +22,9 @@ services:
             # uncomment the next line & volumes section
             # COOKIE_PATH: "/cookies.json"
 
+            # NAS archival configuration - uncomment to save all downloads
+            # MEDIA_ARCHIVE_ROOT: "/archive"
+
             # it's recommended to configure bot protection or api keys if the instance is public,
             # see /docs/protect-an-instance.md for more info
 
@@ -30,9 +33,12 @@ services:
         labels:
             - com.centurylinklabs.watchtower.scope=cobalt
 
-        # uncomment only if you use the COOKIE_PATH variable
-        # volumes:
+        volumes:
+            # uncomment if you use the COOKIE_PATH variable
             # - ./cookies.json:/cookies.json
+            
+            # uncomment to enable NAS archival
+            # - /path/to/your/nas/archive:/archive
 
     # watchtower updates the cobalt image automatically
     watchtower:

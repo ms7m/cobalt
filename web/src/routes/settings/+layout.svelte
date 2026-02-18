@@ -73,12 +73,6 @@
 
         <PageNavSection>
             <PageNavTab
-                path="/settings/local"
-                title={$t("settings.page.local")}
-                icon={IconCpu}
-                iconColor="blue"
-            />
-            <PageNavTab
                 path="/settings/instances"
                 title={$t("settings.page.instances")}
                 icon={IconWorld}

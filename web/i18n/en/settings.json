@@ -7,7 +7,6 @@
     "page.advanced": "advanced",
     "page.debug": "info for nerds",
     "page.instances": "instances",
-    "page.local": "local processing",
     "page.accessibility": "accessibility",
 
     "theme": "theme",
@@ -144,16 +143,6 @@
 
     "advanced.settings_data": "settings data",
     "advanced.local_storage": "local storage",
-
-    "local.saving": "local media processing",
-    "local.saving.description": "when downloading media, remuxing and transcoding will be done on-device instead of the cloud. you'll see detailed progress in the processing queue.\n\ndisabled: local processing will not be used. processing instances can enforce local processing, so this option may not have effect.\npreferred: media that requires extra processing will be downloaded through the processing queue, but the rest of media will be downloaded by your browser's download manager.\nforced: all media will always be proxied and downloaded through the processing queue.\n\nexclusive on-device features are not affected by this setting, they always run locally.",
-    "local.saving.disabled": "disabled",
-    "local.saving.preferred": "preferred",
-    "local.saving.forced": "forced",
-
-    "local.webcodecs": "webcodecs",
-    "local.webcodecs.title": "use webcodecs for on-device processing",
-    "local.webcodecs.description": "when decoding or encoding files, cobalt will try to use webcodecs. this feature allows for GPU-accelerated processing of media files, meaning that all decoding & encoding will be way faster.\n\navailability and stability of this feature depends on your device's and browser's capabilities. stuff might break or not work properly.",
 
     "tabs": "navigation",
     "tabs.hide_remux": "hide the remux tab",

@@ -22,8 +22,6 @@ const defaultSettings: CobaltSettings = {
     },
     save: {
         alwaysProxy: false,
-        localProcessing:
-            device.supports.defaultLocalProcessing ? "preferred" : "disabled",
         audioBitrate: "128",
         audioFormat: "mp3",
         disableMetadata: false,

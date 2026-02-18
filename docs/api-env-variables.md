@@ -12,7 +12,7 @@ this document is not final and will expand over time. feel free to improve it!
 | API_INSTANCE_COUNT     |         | `6`                                   |
 | API_REDIS_URL          |         | `redis://localhost:6379`              |
 | DISABLED_SERVICES      |         | `bilibili,youtube`                    |
-| FORCE_LOCAL_PROCESSING | `never` | `always`                              |
+| MEDIA_ARCHIVE_ROOT     |         | `/archive`                            |
 | API_ENV_FILE           |         | `/.env`                               |
 
 [*view details*](#general)
@@ -68,6 +68,9 @@ this document is not final and will expand over time. feel free to improve it!
 | YOUTUBE_SESSION_INNERTUBE_CLIENT | `WEB_EMBEDDED`           |
 | YOUTUBE_ALLOW_BETTER_AUDIO       | `1`                      |
 | ENABLE_DEPRECATED_YOUTUBE_HLS    | `key`                    |
+| YTDLP_PATH                       | `yt-dlp`                 |
+| DENO_PATH                        | `deno`                   |
+| YTDLP_TIMEOUT_SECONDS            | `120`                    |
 
 [*view details*](#service-specific)
 
@@ -112,11 +115,12 @@ comma-separated list which disables certain services from being used.
 
 the value is a string of cobalt-supported services.
 
-### FORCE_LOCAL_PROCESSING
-the value is a string: `never` (default), `session`, or `always`:
-- when the var is not defined or set to `never`, all requests will be able to set a preference via `localProcessing` in POST requests.
-- when set to `session`, only requests from session (Bearer token) clients will be forced to use on-device processing.
-- when set to `always`, all requests will be forced to use on-device processing, no matter the preference.
+### MEDIA_ARCHIVE_ROOT
+path to a directory where all successfully downloaded media will be archived. media is organized by service in subdirectories: `<root>/<service>/<filename>`.
+
+**note**: this feature is intended for self-hosted deployments in trusted environments. all downloads are archived regardless of client settings.
+
+the value is a path to a directory that the cobalt process has write access to.
 
 ### API_ENV_FILE
 the URL or local path to a `key=value`-style environment variable file. this is used for dynamically reloading environment variables. **not all environment variables are able to be updated by this.** (e.g. the ratelimiters are instantiated when starting cobalt, and cannot be changed)
@@ -281,3 +285,18 @@ the value is a string: `never` (default), `key`, or `always`:
 - when the var is not defined or set to `never`, `youtubeHLS` in POST requests will be ignored.
 - when set to `key`, only requests from api-key clients will be able to use `youtubeHLS` in POST requests.
 - when set to `always`, all requests will be able to use `youtubeHLS` in POST requests.
+
+### YTDLP_PATH
+path to the yt-dlp binary. used for YouTube extraction. if not set, defaults to `yt-dlp` in PATH.
+
+the value is a path to the yt-dlp executable.
+
+### DENO_PATH
+path to the Deno runtime binary. used by yt-dlp for JavaScript execution. if not set, defaults to `deno` in PATH.
+
+the value is a path to the Deno executable.
+
+### YTDLP_TIMEOUT_SECONDS
+timeout in seconds for yt-dlp operations. defaults to `120` seconds.
+
+the value is a number.

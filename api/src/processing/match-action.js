@@ -6,8 +6,6 @@ import { createStream } from "../stream/manage.js";
 import { splitFilenameExtension } from "../misc/utils.js";
 import { convertLanguageCode } from "../misc/language-codes.js";
 
-const extraProcessingTypes = new Set(["merge", "remux", "mute", "audio", "gif"]);
-
 export default function({
     r,
     host,
@@ -20,7 +18,6 @@ export default function({
     requestIP,
     audioBitrate,
     alwaysProxy,
-    localProcessing,
 }) {
     let action,
         responseType = "tunnel",
@@ -245,21 +242,10 @@ export default function({
         defaultParams.filename += `.${audioFormat}`;
     }
 
-    // alwaysProxy is set to true in match.js if localProcessing is forced
-    if (alwaysProxy && responseType === "redirect") {
+    // Force proxy for all downloads in this deployment
+    if (responseType === "redirect") {
         responseType = "tunnel";
         params.type = "proxy";
-    }
-
-    // TODO: add support for HLS
-    // (very painful)
-    if (!params.isHLS && responseType !== "picker") {
-        const isPreferredWithExtra =
-            localProcessing === "preferred" && extraProcessingTypes.has(params.type);
-
-        if (localProcessing === "forced" || isPreferredWithExtra) {
-            responseType = "local-processing";
-        }
     }
 
     // extractors usually return ISO 639-1 language codes,
