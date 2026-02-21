@@ -317,6 +317,8 @@ export const runAPI = async (express, app, __dirname, isPrimary = true) => {
         return stream(res, streamInfo);
     });
 
+    setupArchiveRoutes(app);
+
     app.get('/', (_, res) => {
         res.type('json');
         res.status(200).send(env.envFile ? getServerInfo() : serverInfo);
@@ -386,6 +388,4 @@ export const runAPI = async (express, app, __dirname, isPrimary = true) => {
     });
 
     setupTunnelHandler();
-
-    setupArchiveRoutes(app);
 }
