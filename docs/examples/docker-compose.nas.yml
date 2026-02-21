@@ -1,0 +1,172 @@
+# Cobalt Media Downloader - NAS Deployment
+# This compose file is optimized for self-hosted NAS deployments
+# All downloads are archived locally with customizable folder organization
+
+services:
+  # API Backend - handles downloads, archiving, and processing
+  cobalt-api:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+      target: api
+    
+    container_name: cobalt-api
+    hostname: cobalt-api
+    
+    init: true
+    restart: unless-stopped
+    
+    ports:
+      # API port - exposed for web frontend to connect
+      - "9000:9000"
+    
+    environment:
+      # REQUIRED: Your NAS IP or domain (use HTTP for LAN, HTTPS if you have reverse proxy)
+      # Examples:
+      #   - Local NAS: http://192.168.1.100:9000/
+      #   - With domain: https://cobalt.yourdomain.com/
+      API_URL: "http://YOUR_NAS_IP:9000/"
+      
+      # Port configuration
+      API_PORT: "9000"
+      
+      # Archive configuration - where all downloads are saved
+      MEDIA_ARCHIVE_ROOT: "/archive"
+      
+      # Optional: Custom paths for persistent config files
+      ARCHIVE_CONFIG_PATH: "/config/archive-config.json"
+      ARCHIVE_INDEX_PATH: "/config/archive-index.jsonl"
+      
+      # Optional: Cookie support for authenticated downloads
+      # COOKIE_PATH: "/config/cookies.json"
+      
+      # Optional: Duration limit in seconds (default: 10800 = 3 hours)
+      # DURATION_LIMIT: "10800"
+      
+      # Optional: Number of worker processes
+      # API_INSTANCE_COUNT: "2"
+      
+      # Optional: Processing priority (nice value)
+      # PROCESSING_PRIORITY: "10"
+      
+      # YouTube-specific settings
+      YOUTUBE_ALLOW_BETTER_AUDIO: "1"
+      
+      # Optional: External session generator for YouTube
+      # YOUTUBE_SESSION_SERVER: "http://yt-session-generator:8080/"
+    
+    volumes:
+      # Main archive directory - all downloads go here
+      # Change left side to your actual NAS storage path
+      - /path/to/your/nas/media:/archive
+      
+      # Configuration persistence (archive settings, download history)
+      - ./config:/config
+      
+      # Optional: Cookie file for authenticated downloads
+      # - ./cookies.json:/config/cookies.json:ro
+    
+    # Resource limits (adjust based on your NAS capabilities)
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+    
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:9000/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    
+    networks:
+      - cobalt-network
+
+  # Web Frontend - user interface
+  cobalt-web:
+    build:
+      context: ../web
+      dockerfile: Dockerfile
+    
+    container_name: cobalt-web
+    hostname: cobalt-web
+    
+    init: true
+    restart: unless-stopped
+    
+    ports:
+      # Web UI port
+      - "5173:5173"
+    
+    environment:
+      # REQUIRED: Points to your API backend
+      WEB_DEFAULT_API: "http://YOUR_NAS_IP:9000"
+      
+      # Optional: Your domain for sitemap generation
+      # WEB_HOST: "cobalt.yourdomain.com"
+      
+      # Optional: Analytics (disabled by default)
+      # WEB_PLAUSIBLE_HOST: "plausible.yourdomain.com"
+    
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.1'
+          memory: 128M
+    
+    networks:
+      - cobalt-network
+    
+    depends_on:
+      cobalt-api:
+        condition: service_healthy
+
+  # Optional: YouTube Session Generator
+  # Uncomment if you need automatic poToken/visitor_data generation
+  # yt-session-generator:
+  #   image: ghcr.io/imputnet/yt-session-generator:webserver
+  #   container_name: cobalt-yt-session
+  #   init: true
+  #   restart: unless-stopped
+  #   ports:
+  #     - "8080:8080"
+  #   networks:
+  #     - cobalt-network
+
+  # Optional: Watchtower for automatic updates
+  # Uncomment if you want automatic image updates
+  # watchtower:
+  #   image: ghcr.io/containrrr/watchtower
+  #   container_name: cobalt-watchtower
+  #   restart: unless-stopped
+  #   command: --cleanup --scope cobalt --interval 3600 --include-restarting
+  #   volumes:
+  #     - /var/run/docker.sock:/var/run/docker.sock
+  #   environment:
+  #     - WATCHTOWER_POLL_INTERVAL=3600
+
+networks:
+  cobalt-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+
+# Volume definitions (optional, for named volumes instead of bind mounts)
+# volumes:
+#   cobalt-archive:
+#     driver: local
+#     driver_opts:
+#       type: none
+#       o: bind
+#       device: /path/to/your/nas/media
+#   cobalt-config:
+#     driver: local
