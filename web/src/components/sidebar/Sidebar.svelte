@@ -9,9 +9,8 @@
 
     import IconDownload from "@tabler/icons-svelte/IconDownload.svelte";
     import IconSettings from "@tabler/icons-svelte/IconSettings.svelte";
-
     import IconRepeat from "@tabler/icons-svelte/IconRepeat.svelte";
-
+    import IconFolder from "@tabler/icons-svelte/IconFolder.svelte";
     import IconComet from "@tabler/icons-svelte/IconComet.svelte";
     import IconHeart from "@tabler/icons-svelte/IconHeart.svelte";
     import IconInfoCircle from "@tabler/icons-svelte/IconInfoCircle.svelte";
@@ -32,6 +31,7 @@
     <div id="sidebar-tabs" role="tablist">
         <div id="sidebar-actions" class="sidebar-inner-container">
             <SidebarTab name="save" path="/" icon={IconDownload} />
+            <SidebarTab name="downloads" path="/downloads" icon={IconFolder} />
             {#if !$settings.appearance.hideRemuxTab}
                 <SidebarTab name="remux" path="/remux" icon={IconRepeat} beta />
             {/if}

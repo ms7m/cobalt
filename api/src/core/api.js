@@ -19,6 +19,7 @@ import { friendlyServiceName } from "../processing/service-alias.js";
 import { verifyStream } from "../stream/manage.js";
 import { createResponse, normalizeRequest, getIP } from "../processing/request.js";
 import { setupTunnelHandler } from "./itunnel.js";
+import { setupArchiveRoutes } from "../routes/archive.js";
 
 import * as APIKeys from "../security/api-keys.js";
 import * as Cookies from "../processing/cookie/manager.js";
@@ -385,4 +386,6 @@ export const runAPI = async (express, app, __dirname, isPrimary = true) => {
     });
 
     setupTunnelHandler();
+
+    setupArchiveRoutes(app);
 }

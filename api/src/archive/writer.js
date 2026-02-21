@@ -1,9 +1,11 @@
 import { env } from "../config.js";
-import { mkdir, writeFile, rename, unlink } from "fs/promises";
+import { mkdir, writeFile, rename, unlink, stat, access } from "fs/promises";
 import { dirname, join } from "path";
 import { Readable } from "stream";
 import { pipeline } from "stream/promises";
 import { createWriteStream } from "fs";
+import { getConfig, getServiceDir } from "./config.js";
+import { addToIndex, getFileStats } from "./index.js";
 
 const sanitizeFilename = (filename) => {
     return filename
@@ -20,33 +22,80 @@ const ensureDirectory = async (dirPath) => {
     }
 };
 
-const getArchivePath = (service, filename) => {
-    if (!env.mediaArchiveRoot) return null;
-    
-    const safeService = service.replace(/[^a-z0-9_-]/gi, '_');
-    const safeFilename = sanitizeFilename(filename);
-    const timestamp = Date.now();
-    const uniqueSuffix = Math.random().toString(36).slice(2, 8);
-    const [name, ext] = safeFilename.split(/\.(?=[^.]+$)/);
-    const uniqueFilename = `${name}_${timestamp}_${uniqueSuffix}${ext ? '.' + ext : ''}`;
-    
-    return join(env.mediaArchiveRoot, safeService, uniqueFilename);
-};
-
-export const archiveStream = async (service, filename, stream) => {
-    const archivePath = getArchivePath(service, filename);
-    if (!archivePath) return null;
-    
-    const partPath = archivePath + '.part';
+const getUniqueFilename = async (dirPath, filename) => {
+    const sanitized = sanitizeFilename(filename);
+    let finalPath = join(dirPath, sanitized);
     
     try {
-        await ensureDirectory(dirname(archivePath));
+        await access(finalPath);
+        // File exists, add suffix
+        const lastDot = sanitized.lastIndexOf('.');
+        const name = lastDot > 0 ? sanitized.slice(0, lastDot) : sanitized;
+        const ext = lastDot > 0 ? sanitized.slice(lastDot) : '';
         
+        let counter = 1;
+        while (true) {
+            const newName = `${name} (${counter})${ext}`;
+            finalPath = join(dirPath, newName);
+            try {
+                await access(finalPath);
+                counter++;
+            } catch {
+                return newName;
+            }
+        }
+    } catch {
+        // File doesn't exist, use original
+        return sanitized;
+    }
+};
+
+const getArchivePath = async (service, filename) => {
+    const config = await getConfig();
+    const archiveRoot = config.archiveRoot || env.mediaArchiveRoot;
+    
+    if (!archiveRoot) return null;
+    
+    const serviceFolder = getServiceDir(service);
+    const safeService = serviceFolder.replace(/[^a-z0-9_/-]/gi, '_');
+    const dirPath = join(archiveRoot, safeService);
+    
+    const uniqueFilename = await getUniqueFilename(dirPath, filename);
+    const fullPath = join(dirPath, uniqueFilename);
+    
+    return {
+        fullPath,
+        relativePath: join(safeService, uniqueFilename),
+        filename: uniqueFilename
+    };
+};
+
+export const archiveStream = async (service, filename, stream, mime = 'application/octet-stream') => {
+    const pathInfo = await getArchivePath(service, filename);
+    if (!pathInfo) return null;
+
+    const { fullPath, relativePath } = pathInfo;
+    const partPath = fullPath + '.part';
+
+    try {
+        await ensureDirectory(dirname(fullPath));
+
         const writeStream = createWriteStream(partPath);
         await pipeline(stream, writeStream);
-        
-        await rename(partPath, archivePath);
-        return archivePath;
+
+        await rename(partPath, fullPath);
+
+        // Get file stats and add to index
+        const stats = await getFileStats(fullPath);
+        await addToIndex({
+            service,
+            filename: pathInfo.filename,
+            relativePath,
+            size: stats?.size || 0,
+            mime
+        });
+
+        return fullPath;
     } catch (error) {
         try {
             await unlink(partPath);
@@ -55,49 +104,55 @@ export const archiveStream = async (service, filename, stream) => {
     }
 };
 
-export const createArchiveTee = (service, filename, responseStream) => {
-    const archivePath = getArchivePath(service, filename);
-    if (!archivePath) return responseStream;
-    
-    const partPath = archivePath + '.part';
+export const createArchiveTee = async (service, filename, responseStream, mime = 'application/octet-stream') => {
+    const pathInfo = await getArchivePath(service, filename);
+    if (!pathInfo) return responseStream;
+
+    const { fullPath, relativePath } = pathInfo;
+    const partPath = fullPath + '.part';
     let writeStream;
     let isComplete = false;
     let hasError = false;
-    
-    const ensureDirAndCreateStream = async () => {
-        try {
-            await ensureDirectory(dirname(archivePath));
-            writeStream = createWriteStream(partPath);
-        } catch {
-            hasError = true;
-        }
-    };
-    
-    ensureDirAndCreateStream();
-    
+
+    try {
+        await ensureDirectory(dirname(fullPath));
+        writeStream = createWriteStream(partPath);
+    } catch {
+        hasError = true;
+        return responseStream;
+    }
+
     const teeStream = new Readable({
         read() {}
     });
-    
+
     responseStream.on('data', (chunk) => {
         teeStream.push(chunk);
         if (writeStream && !hasError) {
             writeStream.write(chunk);
         }
     });
-    
+
     responseStream.on('end', async () => {
         teeStream.push(null);
         if (writeStream && !hasError) {
             writeStream.end();
             try {
-                await rename(partPath, archivePath);
+                await rename(partPath, fullPath);
+                const stats = await getFileStats(fullPath);
+                await addToIndex({
+                    service,
+                    filename: pathInfo.filename,
+                    relativePath,
+                    size: stats?.size || 0,
+                    mime
+                });
             } catch {
                 try { await unlink(partPath); } catch {}
             }
         }
     });
-    
+
     responseStream.on('error', async () => {
         teeStream.push(null);
         if (writeStream && !hasError) {
@@ -105,23 +160,24 @@ export const createArchiveTee = (service, filename, responseStream) => {
             try { await unlink(partPath); } catch {}
         }
     });
-    
+
     return teeStream;
 };
 
-export const archiveFFmpegOutput = (service, filename) => {
-    const archivePath = getArchivePath(service, filename);
-    if (!archivePath) return null;
-    
-    const partPath = archivePath + '.part';
+export const archiveFFmpegOutput = async (service, filename, mime = 'application/octet-stream') => {
+    const pathInfo = await getArchivePath(service, filename);
+    if (!pathInfo) return null;
+
+    const { fullPath, relativePath } = pathInfo;
+    const partPath = fullPath + '.part';
     let writeStream;
     let isInitialized = false;
-    
+
     return {
         async initialize() {
             if (isInitialized) return;
             try {
-                await ensureDirectory(dirname(archivePath));
+                await ensureDirectory(dirname(fullPath));
                 writeStream = createWriteStream(partPath);
                 isInitialized = true;
             } catch {
@@ -138,8 +194,16 @@ export const archiveFFmpegOutput = (service, filename) => {
             if (writeStream && isInitialized) {
                 writeStream.end();
                 try {
-                    await rename(partPath, archivePath);
-                    return archivePath;
+                    await rename(partPath, fullPath);
+                    const stats = await getFileStats(fullPath);
+                    await addToIndex({
+                        service,
+                        filename: pathInfo.filename,
+                        relativePath,
+                        size: stats?.size || 0,
+                        mime
+                    });
+                    return fullPath;
                 } catch {
                     try { await unlink(partPath); } catch {}
                     return null;

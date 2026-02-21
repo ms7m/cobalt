@@ -8,6 +8,7 @@
     "page.debug": "info for nerds",
     "page.instances": "instances",
     "page.accessibility": "accessibility",
+    "page.storage": "storage",
 
     "theme": "theme",
     "theme.auto": "auto",
@@ -146,5 +147,16 @@
 
     "tabs": "navigation",
     "tabs.hide_remux": "hide the remux tab",
-    "tabs.hide_remux.description": "if you don't use the remux tool, you can hide it from the navigation bar."
+    "tabs.hide_remux.description": "if you don't use the remux tool, you can hide it from the navigation bar.",
+
+    "storage.root_directory": "root directory",
+    "storage.root_description": "set the base directory where all downloads will be saved. downloads are organized by service in subfolders.",
+    "storage.service_mappings": "service folders",
+    "storage.mappings_description": "customize which folder each service saves to. leave empty to use the service name as the folder.",
+    "storage.quick_setup": "quick setup",
+    "storage.music_services": "music services",
+    "storage.select_service": "select service",
+    "storage.directory_placeholder": "folder name (e.g. music)",
+    "storage.path_preview": "path preview",
+    "storage.loading": "loading storage settings..."
 }

@@ -58,8 +58,24 @@ const getCommand = (args) => {
 const render = async (res, streamInfo, ffargs, estimateMultiplier) => {
     let process;
     const urls = Array.isArray(streamInfo.urls) ? streamInfo.urls : [streamInfo.urls];
-    const archiveWriter = archiveFFmpegOutput(streamInfo.service, streamInfo.filename);
-    
+
+    // Determine mime type from filename extension
+    const ext = streamInfo.filename.split('.').pop()?.toLowerCase();
+    const mimeTypes = {
+        'mp4': 'video/mp4',
+        'webm': 'video/webm',
+        'mkv': 'video/x-matroska',
+        'mp3': 'audio/mpeg',
+        'm4a': 'audio/mp4',
+        'opus': 'audio/opus',
+        'ogg': 'audio/ogg',
+        'wav': 'audio/wav',
+        'gif': 'image/gif'
+    };
+    const mimeType = mimeTypes[ext] || 'application/octet-stream';
+
+    const archiveWriter = await archiveFFmpegOutput(streamInfo.service, streamInfo.filename, mimeType);
+
     const shutdown = () => (
         killProcess(process),
         closeResponse(res),
@@ -82,7 +98,9 @@ const render = async (res, streamInfo, ffargs, estimateMultiplier) => {
 
         const [,,, muxOutput] = process.stdio;
 
-        await archiveWriter.initialize();
+        if (archiveWriter) {
+            await archiveWriter.initialize();
+        }
 
         res.setHeader('Connection', 'keep-alive');
         res.setHeader('Content-Disposition', contentDisposition(streamInfo.filename));
@@ -95,12 +113,16 @@ const render = async (res, streamInfo, ffargs, estimateMultiplier) => {
         // Create a custom pipe that writes to both response and archive
         const customPipe = (from, to, done, writer) => {
             from.on('data', (chunk) => {
-                writer.write(chunk);
+                if (writer) {
+                    writer.write(chunk);
+                }
             });
-            
+
             from.on('error', done)
                 .on('close', async () => {
-                    await writer.finalize();
+                    if (writer) {
+                        await writer.finalize();
+                    }
                     done();
                 });
 
@@ -115,7 +137,9 @@ const render = async (res, streamInfo, ffargs, estimateMultiplier) => {
         process.on('close', shutdown);
         res.on('finish', shutdown);
     } catch {
-        await archiveWriter.abort();
+        if (archiveWriter) {
+            await archiveWriter.abort();
+        }
         shutdown();
     }
 }

@@ -25,5 +25,7 @@
     "clear_cache": "clear cache",
     "remove": "remove",
     "retry": "retry",
-    "delete": "delete"
+    "delete": "delete",
+    "add": "add",
+    "refresh": "refresh"
 }

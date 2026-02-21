@@ -19,6 +19,7 @@
 
     import IconCpu from "@tabler/icons-svelte/IconCpu.svelte";
     import IconWorld from "@tabler/icons-svelte/IconWorld.svelte";
+    import IconFolder from "@tabler/icons-svelte/IconFolder.svelte";
 
     import IconBug from "@tabler/icons-svelte/IconBug.svelte";
     import IconAdjustmentsStar from "@tabler/icons-svelte/IconAdjustmentsStar.svelte";
@@ -77,6 +78,12 @@
                 title={$t("settings.page.instances")}
                 icon={IconWorld}
                 iconColor="purple"
+            />
+            <PageNavTab
+                path="/settings/storage"
+                title={$t("settings.page.storage")}
+                icon={IconFolder}
+                iconColor="blue"
             />
         </PageNavSection>
 

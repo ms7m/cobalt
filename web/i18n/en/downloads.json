@@ -1,0 +1,8 @@
+{
+    "title": "downloads",
+    "loading": "loading...",
+    "empty": "no downloads yet",
+    "load_more": "load more",
+    "service_filter": "filter by service",
+    "retry": "retry"
+}

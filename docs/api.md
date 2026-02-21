@@ -200,3 +200,77 @@ can be used to show approximate download progress in UI.
 - 404: Not Found
 - 429: Too Many Requests (rate limit exceeded, check [RateLimit-* headers](https://www.ietf.org/archive/id/draft-polli-ratelimit-headers-02.html#name-header-specifications))
 - 500: Internal Server Error.
+
+## Archive API Endpoints
+
+### GET `/archive/config`
+returns the current archive configuration.
+
+**response body:**
+```json
+{
+    "success": true,
+    "config": {
+        "archiveRoot": "/path/to/archive",
+        "serviceDirs": {
+            "youtube": "videos",
+            "soundcloud": "music"
+        }
+    }
+}
+```
+
+### PUT `/archive/config`
+updates the archive configuration.
+
+**request body:**
+```json
+{
+    "archiveRoot": "/new/path/to/archive",
+    "serviceDirs": {
+        "youtube": "videos"
+    }
+}
+```
+
+### PUT `/archive/config/services/:service`
+sets a custom directory for a specific service.
+
+**request body:**
+```json
+{
+    "directory": "custom-folder"
+}
+```
+
+### GET `/archive/downloads`
+lists archived downloads with pagination.
+
+**query parameters:**
+- `limit` (number, default: 50)
+- `cursor` (number, default: 0)
+- `service` (string, optional)
+
+**response body:**
+```json
+{
+    "success": true,
+    "entries": [
+        {
+            "id": "abc123",
+            "service": "youtube",
+            "filename": "video.mp4",
+            "relativePath": "youtube/video.mp4",
+            "size": 12345678,
+            "mime": "video/mp4",
+            "createdAt": "2024-01-15T10:30:00Z"
+        }
+    ],
+    "total": 100,
+    "cursor": 0,
+    "hasMore": true
+}
+```
+
+### GET `/archive/file/:id`
+downloads an archived file by its ID.

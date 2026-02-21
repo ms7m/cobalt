@@ -38,7 +38,7 @@ export default async function (streamInfo, res) {
         }
 
         // Create a tee stream that archives to NAS while sending to client
-        const teeStream = createArchiveTee(streamInfo.service, streamInfo.filename, stream);
+        const teeStream = await createArchiveTee(streamInfo.service, streamInfo.filename, stream, headers['content-type']);
         pipe(teeStream, res, shutdown);
     } catch {
         shutdown();
