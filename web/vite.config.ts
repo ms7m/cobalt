@@ -1,6 +1,4 @@
 import mime from "mime";
-import basicSSL from "@vitejs/plugin-basic-ssl";
-
 import { glob } from "glob";
 import { sveltekit } from "@sveltejs/kit/vite";
 import { createSitemap } from "svelte-sitemap/src/index";
@@ -51,16 +49,7 @@ const exposeLibAV: PluginOption = (() => {
     }
 })();
 
-const enableCOEP: PluginOption = {
-    name: "isolation",
-    configureServer(server) {
-        server.middlewares.use((_req, res, next) => {
-            res.setHeader("Cross-Origin-Opener-Policy", "same-origin");
-            res.setHeader("Cross-Origin-Embedder-Policy", "require-corp");
-            next();
-        })
-    }
-};
+
 
 const generateSitemap: PluginOption = {
     name: "generate-sitemap",
@@ -69,7 +58,7 @@ const generateSitemap: PluginOption = {
             return;
         }
 
-        await createSitemap(`https://${process.env.WEB_HOST}`, {
+        await createSitemap(`http://${process.env.WEB_HOST}`, {
             changeFreq: 'monthly',
             outDir: '.svelte-kit/output/prerendered/pages',
             resetTime: true
@@ -91,9 +80,7 @@ const checkDefaultApiEnv = (): PluginOption => ({
 export default defineConfig({
     plugins: [
         checkDefaultApiEnv(),
-        basicSSL(),
         sveltekit(),
-        enableCOEP,
         exposeLibAV,
         generateSitemap
     ],
@@ -113,16 +100,11 @@ export default defineConfig({
         }
     },
     server: {
-        headers: {
-            "Cross-Origin-Opener-Policy": "same-origin",
-            "Cross-Origin-Embedder-Policy": "require-corp"
-        },
         fs: {
             allow: [
                 searchForWorkspaceRoot(process.cwd())
             ]
-        },
-        proxy: {}
+        }
     },
     optimizeDeps: {
         exclude: ["@imput/libav.js-remux-cli"]

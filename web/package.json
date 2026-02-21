@@ -37,7 +37,6 @@
         "@types/eslint__js": "^8.42.3",
         "@types/fluent-ffmpeg": "^2.1.25",
         "@types/node": "^20.14.10",
-        "@vitejs/plugin-basic-ssl": "^1.1.0",
         "compare-versions": "^6.1.0",
         "dotenv": "^16.0.1",
         "eslint": "^9.16.0",
