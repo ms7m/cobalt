@@ -18,16 +18,29 @@ This docker-compose configuration is optimized for self-hosted NAS deployments w
    cd cobalt
    ```
 
-2. **Edit the docker-compose file**:
+2. **Create a GitHub token for private GHCR pulls**:
+   - Go to GitHub -> Settings -> Developer settings -> Personal access tokens
+   - Create a token with at least `read:packages`
+
+3. **Log in to GHCR from your NAS**:
+   ```bash
+   docker login ghcr.io -u YOUR_GITHUB_USERNAME
+   ```
+   Use the token from step 2 as the password.
+
+4. **Edit the docker-compose file**:
    ```bash
    nano docs/examples/docker-compose.nas.yml
    ```
-   
-   Replace `YOUR_NAS_IP` with your actual NAS IP address:
-   - Line 32: `API_URL: "http://192.168.1.100:9000/"`
-   - Line 91: `WEB_DEFAULT_API: "http://192.168.1.100:9000"`
 
-3. **Set your archive path** (line 58):
+   Replace the image with your private package path:
+   - `image: ghcr.io/YOUR_GITHUB_USERNAME/cobalt-api:nas-latest`
+    
+   Replace `YOUR_NAS_IP` with your actual NAS IP address:
+   - `API_URL: "http://192.168.1.100:9000/"`
+   - `WEB_DEFAULT_API: "http://192.168.1.100:9000"`
+
+5. **Set your archive path** (line 58):
    ```yaml
    volumes:
      - /volume1/media/downloads:/archive  # Synology example
@@ -37,17 +50,17 @@ This docker-compose configuration is optimized for self-hosted NAS deployments w
      - /srv/dev-disk-by-uuid-xxx/media:/archive  # OpenMediaVault example
    ```
 
-4. **Create config directory**:
+6. **Create config directory**:
    ```bash
    mkdir -p config
    ```
 
-5. **Deploy**:
+7. **Deploy**:
    ```bash
    docker-compose -f docs/examples/docker-compose.nas.yml up -d
    ```
 
-6. **Access**:
+8. **Access**:
    - Web UI: http://YOUR_NAS_IP:5173
    - API: http://YOUR_NAS_IP:9000
 
@@ -128,7 +141,8 @@ To update to the latest code:
 ```bash
 cd cobalt
 git pull
-docker-compose -f docs/examples/docker-compose.nas.yml up -d --build
+docker-compose -f docs/examples/docker-compose.nas.yml pull
+docker-compose -f docs/examples/docker-compose.nas.yml up -d
 ```
 
 ## Troubleshooting

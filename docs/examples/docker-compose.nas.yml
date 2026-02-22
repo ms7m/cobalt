@@ -5,10 +5,14 @@
 services:
   # API Backend - handles downloads, archiving, and processing
   cobalt-api:
-    build:
-      context: ..
-      dockerfile: Dockerfile
-      target: api
+    # Pull from your private GHCR package (published by .github/workflows/docker-nas-ghcr.yml)
+    image: ghcr.io/YOUR_GITHUB_USERNAME/cobalt-api:nas-latest
+
+    # Optional local build fallback
+    # build:
+    #   context: ..
+    #   dockerfile: Dockerfile
+    #   target: api
     
     container_name: cobalt-api
     hostname: cobalt-api
