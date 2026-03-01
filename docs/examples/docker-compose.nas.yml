@@ -92,9 +92,13 @@ services:
 
   # Web Frontend - user interface
   cobalt-web:
-    build:
-      context: ../web
-      dockerfile: Dockerfile
+    # Pull from your private GHCR package (published by .github/workflows/docker-nas-ghcr.yml)
+    image: ghcr.io/YOUR_GITHUB_USERNAME/cobalt-web:nas-latest
+
+    # Optional local build fallback
+    # build:
+    #   context: ../..
+    #   dockerfile: web/Dockerfile
     
     container_name: cobalt-web
     hostname: cobalt-web
@@ -108,6 +112,7 @@ services:
     
     environment:
       # REQUIRED: Points to your API backend
+      # This is injected into frontend assets when the container starts.
       WEB_DEFAULT_API: "http://YOUR_NAS_IP:9000"
       
       # Optional: Your domain for sitemap generation

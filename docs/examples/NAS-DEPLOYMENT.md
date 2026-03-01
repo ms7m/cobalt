@@ -18,29 +18,36 @@ This docker-compose configuration is optimized for self-hosted NAS deployments w
    cd cobalt
    ```
 
-2. **Create a GitHub token for private GHCR pulls**:
+2. **Publish your private GHCR images**:
+   - In your fork, run workflow: `.github/workflows/docker-nas-ghcr.yml`
+   - It publishes both images:
+     - `ghcr.io/YOUR_GITHUB_USERNAME/cobalt-api:nas-latest`
+     - `ghcr.io/YOUR_GITHUB_USERNAME/cobalt-web:nas-latest`
+
+3. **Create a GitHub token for private GHCR pulls**:
    - Go to GitHub -> Settings -> Developer settings -> Personal access tokens
    - Create a token with at least `read:packages`
 
-3. **Log in to GHCR from your NAS**:
+4. **Log in to GHCR from your NAS**:
    ```bash
    docker login ghcr.io -u YOUR_GITHUB_USERNAME
    ```
-   Use the token from step 2 as the password.
+   Use the token from step 3 as the password.
 
-4. **Edit the docker-compose file**:
+5. **Edit the docker-compose file**:
    ```bash
    nano docs/examples/docker-compose.nas.yml
    ```
 
-   Replace the image with your private package path:
+   Replace both image references with your private package paths:
    - `image: ghcr.io/YOUR_GITHUB_USERNAME/cobalt-api:nas-latest`
+   - `image: ghcr.io/YOUR_GITHUB_USERNAME/cobalt-web:nas-latest`
     
    Replace `YOUR_NAS_IP` with your actual NAS IP address:
    - `API_URL: "http://192.168.1.100:9000/"`
    - `WEB_DEFAULT_API: "http://192.168.1.100:9000"`
 
-5. **Set your archive path** (line 58):
+6. **Set your archive path** (line 58):
    ```yaml
    volumes:
      - /volume1/media/downloads:/archive  # Synology example
@@ -50,17 +57,17 @@ This docker-compose configuration is optimized for self-hosted NAS deployments w
      - /srv/dev-disk-by-uuid-xxx/media:/archive  # OpenMediaVault example
    ```
 
-6. **Create config directory**:
+7. **Create config directory**:
    ```bash
    mkdir -p config
    ```
 
-7. **Deploy**:
+8. **Deploy**:
    ```bash
    docker-compose -f docs/examples/docker-compose.nas.yml up -d
    ```
 
-8. **Access**:
+9. **Access**:
    - Web UI: http://YOUR_NAS_IP:5173
    - API: http://YOUR_NAS_IP:9000
 
