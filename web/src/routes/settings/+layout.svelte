@@ -25,7 +25,7 @@
     import IconAdjustmentsStar from "@tabler/icons-svelte/IconAdjustmentsStar.svelte";
 
     $: versionText = $version
-        ? `v${$version.version}-${$version.commit.slice(0, 8)}`
+        ? `cobalt base: v${$version.version} | branch: ${$version.branch || "unknown"}`
         : "\xa0";
 </script>
 
