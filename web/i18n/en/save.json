@@ -22,6 +22,7 @@
     "tutorial.shortcut.files": "to files",
 
     "label.community_instance": "mikka edition",
+    "archive.path_hint": "detected {{ service }} -> saves to {{ path }}",
 
     "tooltip.captcha": "cloudflare turnstile is checking if you're not a bot, please wait!"
 }

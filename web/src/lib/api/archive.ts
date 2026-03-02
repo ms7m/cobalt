@@ -39,6 +39,12 @@ export interface ArchiveBrowseResponse {
     entries: ArchiveBrowseEntry[];
 }
 
+export interface ArchiveMutationResult {
+    success: boolean;
+    config?: ArchiveConfig;
+    error?: string;
+}
+
 export const getArchiveConfig = async (): Promise<ArchiveConfig | null> => {
     try {
         const response = await fetch(`${currentApiURL()}/archive/config`);
@@ -71,7 +77,10 @@ export const setArchiveConfig = async (config: Partial<ArchiveConfig>): Promise<
     }
 };
 
-export const setServiceDirectory = async (service: string, directory: string | null): Promise<boolean> => {
+export const setServiceDirectory = async (
+    service: string,
+    directory: string | null
+): Promise<ArchiveMutationResult> => {
     try {
         const response = await fetch(`${currentApiURL()}/archive/config/services/${service}`, {
             method: 'PUT',
@@ -81,9 +90,22 @@ export const setServiceDirectory = async (service: string, directory: string | n
             body: JSON.stringify({ directory })
         });
         const data = await response.json();
-        return data.success;
+        if (data.success) {
+            return {
+                success: true,
+                config: data.config,
+            };
+        }
+
+        return {
+            success: false,
+            error: data?.error || 'Failed to save service mapping',
+        };
     } catch {
-        return false;
+        return {
+            success: false,
+            error: 'Request failed while saving service mapping',
+        };
     }
 };
 

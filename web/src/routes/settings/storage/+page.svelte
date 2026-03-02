@@ -20,6 +20,7 @@
     let config: ArchiveConfig | null = null;
     let loading = true;
     let saving = false;
+    let saveError = "";
 
     let dialogOpen = false;
     let dialogMode: MappingDialogMode = "add";
@@ -59,6 +60,7 @@
 
     const loadConfig = async () => {
         loading = true;
+        saveError = "";
         config = await getArchiveConfig();
         loading = false;
     };
@@ -73,14 +75,24 @@
 
     const setQuickMapping = async (service: string, directory: string) => {
         saving = true;
-        await setServiceDirectory(service, directory);
+        const result = await setServiceDirectory(service, directory);
+        if (!result.success) {
+            saveError = result.error || "Could not save mapping.";
+            saving = false;
+            return;
+        }
         await loadConfig();
         saving = false;
     };
 
     const removeServiceMapping = async (service: string) => {
         saving = true;
-        await setServiceDirectory(service, null);
+        const result = await setServiceDirectory(service, null);
+        if (!result.success) {
+            saveError = result.error || "Could not remove mapping.";
+            saving = false;
+            return;
+        }
         await loadConfig();
         saving = false;
     };
@@ -100,6 +112,7 @@
 
     const openAddDialog = () => {
         const [firstAvailableService] = availableServices();
+        saveError = "";
         dialogMode = "add";
         dialogService = firstAvailableService || "";
         dialogDirectory = firstAvailableService || "";
@@ -108,6 +121,7 @@
     };
 
     const openEditDialog = (service: string, directory: string) => {
+        saveError = "";
         dialogMode = "edit";
         dialogService = service;
         dialogDirectory = directory;
@@ -116,6 +130,7 @@
     };
 
     const closeDialog = () => {
+        saveError = "";
         dialogOpen = false;
     };
 
@@ -125,7 +140,14 @@
         if (!service || !directory) return;
 
         saving = true;
-        await setServiceDirectory(service, directory);
+        const result = await setServiceDirectory(service, directory);
+        if (!result.success) {
+            saveError = result.error || "Could not save mapping.";
+            saving = false;
+            return;
+        }
+
+        saveError = "";
         await loadConfig();
         saving = false;
         closeDialog();
@@ -198,6 +220,10 @@
         <div class="setting-description">
             {$t("settings.storage.mappings_description")}
         </div>
+
+        {#if saveError}
+            <div class="save-error">{saveError}</div>
+        {/if}
 
         <div class="quick-mappings">
             <h4>{$t("settings.storage.quick_setup")}</h4>
@@ -409,6 +435,9 @@
             </div>
 
             <div class="modal-actions">
+                {#if saveError}
+                    <span class="modal-error">{saveError}</span>
+                {/if}
                 <button type="button" class="button" on:click={closeDialog} disabled={saving}>Cancel</button>
                 <button
                     type="button"
@@ -451,6 +480,15 @@
         padding: 16px;
         background: var(--button);
         border-radius: var(--border-radius);
+    }
+
+    .save-error {
+        margin-bottom: 12px;
+        padding: 10px 12px;
+        border-radius: var(--border-radius);
+        background: color-mix(in srgb, var(--red) 15%, var(--button));
+        color: var(--red);
+        font-size: 13px;
     }
 
     .quick-mappings h4 {
@@ -785,8 +823,15 @@
     .modal-actions {
         margin-top: 14px;
         display: flex;
+        align-items: center;
         justify-content: flex-end;
         gap: 8px;
+    }
+
+    .modal-error {
+        margin-right: auto;
+        color: var(--red);
+        font-size: 12px;
     }
 
     @media screen and (max-width: 760px) {

@@ -1,7 +1,7 @@
 <script lang="ts">
     import env, { officialApiURL } from "$lib/env";
 
-    import { tick } from "svelte";
+    import { onMount, tick } from "svelte";
     import { page } from "$app/state";
     import { goto } from "$app/navigation";
     import { browser } from "$app/environment";
@@ -15,6 +15,8 @@
     import { savingHandler } from "$lib/api/saving-handler";
     import { pasteLinkFromClipboard } from "$lib/clipboard";
     import { turnstileEnabled, turnstileSolved } from "$lib/state/turnstile";
+    import { getArchiveConfig, type ArchiveConfig } from "$lib/api/archive";
+    import { detectServiceFromURL, resolveArchivePath } from "$lib/archive/path-resolver";
 
     import type { Optional } from "$lib/types/generic";
     import type { DownloadModeOption } from "$lib/types/settings";
@@ -34,6 +36,7 @@
     import IconClipboard from "$components/icons/Clipboard.svelte";
 
     let linkInput: Optional<HTMLInputElement>;
+    let archiveConfig: ArchiveConfig | null = $state(null);
 
     const validLink = (url: string) => {
         try {
@@ -57,6 +60,12 @@
 
     let downloadable = $derived(validLink($link));
     let clearVisible = $derived($link && !isLoading);
+    let detectedService = $derived(detectServiceFromURL($link || ""));
+    let detectedArchivePath = $derived(resolveArchivePath(archiveConfig, detectedService));
+
+    onMount(async () => {
+        archiveConfig = await getArchiveConfig();
+    });
 
     $effect (() => {
         if (linkPrefill) {
@@ -196,6 +205,15 @@
             bind:loading={isLoading}
         />
     </div>
+
+    {#if detectedService && detectedArchivePath}
+        <div id="archive-path-hint">
+            {$t("save.archive.path_hint", {
+                service: detectedService,
+                path: detectedArchivePath.fullPath,
+            })}
+        </div>
+    {/if}
 
     <div id="action-container">
         <Switcher>
@@ -357,6 +375,13 @@
         font-size: 13px;
         color: var(--gray);
         font-weight: 500;
+    }
+
+    #archive-path-hint {
+        font-size: 12px;
+        color: var(--gray);
+        font-family: monospace;
+        line-height: 1.4;
     }
 
     @media screen and (max-width: 440px) {

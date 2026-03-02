@@ -20,5 +20,6 @@
     "tutorial.intro": "чтобы удобно сохранять файлы на ios, придётся использовать команду siri в меню обмена.",
     "tutorial.outro": "эти команды siri будут работать только из приложения кобальта, использовать их из других приложений не получится.",
     "tooltip.captcha": "cloudflare turnstile проверяет, что ты не бот. подожди, пожалуйста!",
-    "label.community_instance": "mikka edition"
+    "label.community_instance": "mikka edition",
+    "archive.path_hint": "обнаружен {{ service }} -> сохранение в {{ path }}"
 }
