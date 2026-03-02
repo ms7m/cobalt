@@ -49,7 +49,7 @@
     let isFocused = $state(false);
     let isDisabled = $state(false);
     let isLoading = $state(false);
-    let useBackgroundMode = $state(false);
+    let useBackgroundMode = $state(true); // Default to background mode
 
     let isHovered = $state(false);
 
@@ -226,6 +226,7 @@
             url={$link}
             bind:disabled={isDisabled}
             bind:loading={isLoading}
+            useBackgroundMode={useBackgroundMode}
         />
     </div>
 
@@ -272,15 +273,13 @@
             <span id="paste-mobile-text">{$t("save.paste.long")}</span>
         </ActionButton>
 
-        <button
-            type="button"
-            id="background-mode-toggle"
-            class:active={useBackgroundMode}
-            on:click={() => (useBackgroundMode = !useBackgroundMode)}
-            title={useBackgroundMode ? "Background mode enabled" : "Background mode disabled"}
-        >
-            {useBackgroundMode ? "📥 BG" : "⚡ DL"}
-        </button>
+        <label id="background-mode-checkbox-label" title="Download to NAS archive in background">
+            <input
+                type="checkbox"
+                bind:checked={useBackgroundMode}
+            />
+            <span>Save to NAS</span>
+        </label>
     </div>
 </div>
 
@@ -417,20 +416,21 @@
         line-height: 1.4;
     }
 
-    #background-mode-toggle {
-        padding: 8px 12px;
-        background: var(--button);
-        border: none;
-        border-radius: var(--border-radius);
-        font-size: 12px;
-        font-weight: 500;
+    #background-mode-checkbox-label {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 13px;
+        color: var(--secondary);
         cursor: pointer;
-        color: var(--gray);
+        user-select: none;
     }
 
-    #background-mode-toggle.active {
-        background: var(--accent);
-        color: var(--primary);
+    #background-mode-checkbox-label input[type="checkbox"] {
+        width: 16px;
+        height: 16px;
+        cursor: pointer;
+        accent-color: var(--accent);
     }
 
     @media screen and (max-width: 440px) {

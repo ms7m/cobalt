@@ -3,13 +3,18 @@
     import { t } from "$lib/i18n/translations";
     import { hapticSwitch } from "$lib/haptics";
     import { savingHandler } from "$lib/api/saving-handler";
+    import { submitBackgroundJob } from "$lib/api/background-job-handler";
     import { downloadButtonState } from "$lib/state/omnibox";
+    import { queueVisible } from "$lib/state/queue-visibility";
+    import { detectServiceFromURL } from "$lib/archive/path-resolver";
+    import { getArchiveConfig } from "$lib/api/archive";
 
     import type { CobaltDownloadButtonState } from "$lib/types/omnibox";
 
     export let url: string;
     export let disabled = false;
     export let loading = false;
+    export let useBackgroundMode = false;
 
     $: buttonText = ">>";
     $: buttonAltText = $t("a11y.save.download");
@@ -54,9 +59,17 @@
 <button
     id="download-button"
     {disabled}
-    on:click={() => {
+    on:click={async () => {
         hapticSwitch();
-        savingHandler({ url });
+        if (useBackgroundMode) {
+            const service = detectServiceFromURL(url);
+            const job = await submitBackgroundJob({ url, service: service || undefined });
+            if (job) {
+                queueVisible.set(true);
+            }
+        } else {
+            savingHandler({ url });
+        }
     }}
     aria-label={buttonAltText}
 >
