@@ -1,11 +1,41 @@
-import { join } from "path";
+import { join, normalize, resolve, sep } from "path";
 import { createReadStream } from "fs";
-import { stat } from "fs/promises";
+import { readdir, stat } from "fs/promises";
 import { getConfig, setConfig, getServiceDir, setServiceDir } from "../archive/config.js";
 import { listEntries, getEntryById } from "../archive/index.js";
 import { env } from "../config.js";
 
 export const setupArchiveRoutes = (app) => {
+    const resolveArchiveRoot = async () => {
+        const config = await getConfig();
+        const archiveRoot = config.archiveRoot || env.mediaArchiveRoot;
+
+        if (!archiveRoot) {
+            throw new Error("Archive root not configured");
+        }
+
+        return archiveRoot;
+    };
+
+    const normalizeRelativePath = (inputPath = "") => {
+        const safeInput = String(inputPath || "").replace(/\\/g, '/');
+        const normalized = normalize(safeInput)
+            .replace(/\\/g, '/')
+            .replace(/^\/+/, '')
+            .replace(/^\.\//, '');
+
+        if (!normalized || normalized === '.') return '';
+        if (normalized === '..' || normalized.startsWith('../')) {
+            throw new Error("Invalid path");
+        }
+
+        return normalized;
+    };
+
+    const isInsideRoot = (root, candidate) => {
+        return candidate === root || candidate.startsWith(`${root}${sep}`);
+    };
+
     // Get archive configuration
     app.get('/archive/config', async (req, res) => {
         try {
@@ -101,6 +131,90 @@ export const setupArchiveRoutes = (app) => {
         }
     });
 
+    // Browse archive directories/files for NAS mapping UI
+    app.get('/archive/browse', async (req, res) => {
+        try {
+            const rootPath = resolve(await resolveArchiveRoot());
+            const requestedPath = normalizeRelativePath(req.query.path);
+            const includeFiles = req.query.includeFiles !== '0';
+            const absolutePath = resolve(rootPath, requestedPath);
+
+            if (!isInsideRoot(rootPath, absolutePath)) {
+                return res.status(400).json({
+                    success: false,
+                    error: "Path escapes archive root"
+                });
+            }
+
+            const stats = await stat(absolutePath);
+            if (!stats.isDirectory()) {
+                return res.status(400).json({
+                    success: false,
+                    error: "Path is not a directory"
+                });
+            }
+
+            const dirEntries = await readdir(absolutePath, { withFileTypes: true });
+            const entries = [];
+
+            for (const entry of dirEntries) {
+                const isDirectory = entry.isDirectory();
+                const isFile = entry.isFile();
+
+                if (!isDirectory && (!includeFiles || !isFile)) {
+                    continue;
+                }
+
+                if (!isDirectory && !isFile) {
+                    continue;
+                }
+
+                const entryAbsolutePath = join(absolutePath, entry.name);
+                const entryStats = await stat(entryAbsolutePath);
+                const entryRelativePath = requestedPath
+                    ? `${requestedPath}/${entry.name}`
+                    : entry.name;
+
+                entries.push({
+                    name: entry.name,
+                    path: entryRelativePath,
+                    type: isDirectory ? 'directory' : 'file',
+                    size: isFile ? entryStats.size : null,
+                    modifiedAt: entryStats.mtime.toISOString()
+                });
+            }
+
+            entries.sort((a, b) => {
+                if (a.type !== b.type) {
+                    return a.type === 'directory' ? -1 : 1;
+                }
+
+                return a.name.localeCompare(b.name);
+            });
+
+            const parentPath = requestedPath.includes('/')
+                ? requestedPath.slice(0, requestedPath.lastIndexOf('/'))
+                : (requestedPath ? '' : null);
+
+            res.json({
+                success: true,
+                root: rootPath,
+                currentPath: requestedPath,
+                parentPath,
+                entries
+            });
+        } catch (error) {
+            const message = error?.message || "Failed to browse archive path";
+            const status = ["Archive root not configured", "Invalid path"].includes(message)
+                ? 400
+                : 500;
+            res.status(status).json({
+                success: false,
+                error: message
+            });
+        }
+    });
+
     // Download archived file by ID
     app.get('/archive/file/:id', async (req, res) => {
         try {
@@ -114,15 +228,7 @@ export const setupArchiveRoutes = (app) => {
                 });
             }
             
-            const config = await getConfig();
-            const archiveRoot = config.archiveRoot || env.mediaArchiveRoot;
-            
-            if (!archiveRoot) {
-                return res.status(500).json({
-                    success: false,
-                    error: "Archive root not configured"
-                });
-            }
+            const archiveRoot = await resolveArchiveRoot();
             
             const filePath = join(archiveRoot, entry.relativePath);
             

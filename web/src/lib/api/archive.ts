@@ -23,6 +23,22 @@ export interface ArchiveListResponse {
     hasMore: boolean;
 }
 
+export interface ArchiveBrowseEntry {
+    name: string;
+    path: string;
+    type: 'directory' | 'file';
+    size: number | null;
+    modifiedAt: string;
+}
+
+export interface ArchiveBrowseResponse {
+    success: boolean;
+    root: string;
+    currentPath: string;
+    parentPath: string | null;
+    entries: ArchiveBrowseEntry[];
+}
+
 export const getArchiveConfig = async (): Promise<ArchiveConfig | null> => {
     try {
         const response = await fetch(`${currentApiURL()}/archive/config`);
@@ -97,10 +113,31 @@ export const downloadArchiveFile = (id: string): string => {
     return `${currentApiURL()}/archive/file/${id}`;
 };
 
+export const browseArchiveDirectory = async (
+    path = "",
+    includeFiles = true
+): Promise<ArchiveBrowseResponse | null> => {
+    try {
+        const params = new URLSearchParams();
+        if (path) params.set('path', path);
+        params.set('includeFiles', includeFiles ? '1' : '0');
+
+        const response = await fetch(`${currentApiURL()}/archive/browse?${params}`);
+        const data = await response.json();
+        if (data.success) {
+            return data;
+        }
+        return null;
+    } catch {
+        return null;
+    }
+};
+
 export default {
     getArchiveConfig,
     setArchiveConfig,
     setServiceDirectory,
+    browseArchiveDirectory,
     listArchiveDownloads,
     downloadArchiveFile
 };

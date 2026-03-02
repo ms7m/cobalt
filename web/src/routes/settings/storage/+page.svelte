@@ -5,6 +5,8 @@
         getArchiveConfig,
         setArchiveConfig,
         setServiceDirectory,
+        browseArchiveDirectory,
+        type ArchiveBrowseEntry,
         type ArchiveConfig
     } from "$lib/api/archive";
 
@@ -23,6 +25,12 @@
     let dialogMode: MappingDialogMode = "add";
     let dialogService = "";
     let dialogDirectory = "";
+    let browseRootPath = "";
+    let browseCurrentPath = "";
+    let browseParentPath: string | null = null;
+    let browseEntries: ArchiveBrowseEntry[] = [];
+    let browseLoading = false;
+    let browseError = "";
 
     const services = [
         "youtube",
@@ -96,6 +104,7 @@
         dialogService = firstAvailableService || "";
         dialogDirectory = firstAvailableService || "";
         dialogOpen = true;
+        loadBrowseEntries("");
     };
 
     const openEditDialog = (service: string, directory: string) => {
@@ -103,6 +112,7 @@
         dialogService = service;
         dialogDirectory = directory;
         dialogOpen = true;
+        loadBrowseEntries("");
     };
 
     const closeDialog = () => {
@@ -119,6 +129,44 @@
         await loadConfig();
         saving = false;
         closeDialog();
+    };
+
+    const loadBrowseEntries = async (path = "") => {
+        browseLoading = true;
+        browseError = "";
+
+        const result = await browseArchiveDirectory(path, true);
+        if (!result) {
+            browseError = "Could not load directories from archive root.";
+            browseLoading = false;
+            return;
+        }
+
+        browseRootPath = result.root;
+        browseCurrentPath = result.currentPath;
+        browseParentPath = result.parentPath;
+        browseEntries = result.entries;
+        browseLoading = false;
+    };
+
+    const chooseBrowseDirectory = (path: string) => {
+        dialogDirectory = path || dialogService || "";
+    };
+
+    const formatBytes = (value: number | null) => {
+        if (value === null || value < 0) return "-";
+        if (value < 1024) return `${value} B`;
+
+        const units = ["KB", "MB", "GB", "TB"];
+        let size = value / 1024;
+        let unitIndex = 0;
+
+        while (size >= 1024 && unitIndex < units.length - 1) {
+            size /= 1024;
+            unitIndex += 1;
+        }
+
+        return `${size.toFixed(size >= 10 ? 0 : 1)} ${units[unitIndex]}`;
     };
 </script>
 
@@ -278,6 +326,85 @@
                 <div class="preview-card">
                     <span>Files from <strong>{dialogService || "service"}</strong> will be saved to:</span>
                     <code>{fullPathFor(dialogService, dialogDirectory)}</code>
+                </div>
+
+                <div class="browser-card">
+                    <div class="browser-header">
+                        <strong>NAS directory browser</strong>
+                        <div class="browser-paths">
+                            <span class="muted">Root: <code>{browseRootPath || (config?.archiveRoot || "/archive")}</code></span>
+                            <span class="muted">Current: <code>/{browseCurrentPath || ""}</code></span>
+                        </div>
+                    </div>
+
+                    <div class="browser-actions">
+                        <button
+                            type="button"
+                            class="button chip"
+                            on:click={() => loadBrowseEntries("")}
+                            disabled={browseLoading}
+                        >
+                            Root
+                        </button>
+                        <button
+                            type="button"
+                            class="button chip"
+                            on:click={() => browseParentPath !== null && loadBrowseEntries(browseParentPath)}
+                            disabled={browseLoading || browseParentPath === null}
+                        >
+                            Up
+                        </button>
+                        <button
+                            type="button"
+                            class="button chip"
+                            on:click={() => chooseBrowseDirectory(browseCurrentPath)}
+                            disabled={browseLoading}
+                        >
+                            Use current folder
+                        </button>
+                    </div>
+
+                    {#if browseError}
+                        <div class="browser-message error">{browseError}</div>
+                    {:else if browseLoading}
+                        <div class="browser-message">Loading directories...</div>
+                    {:else}
+                        <div class="browser-list">
+                            {#if browseEntries.length === 0}
+                                <div class="browser-message">This folder is empty.</div>
+                            {:else}
+                                {#each browseEntries as entry}
+                                    <div class="browser-item">
+                                        <div class="browser-item-info">
+                                            <span class="browser-item-name">{entry.type === "directory" ? "[DIR]" : "[FILE]"} {entry.name}</span>
+                                            <span class="browser-item-meta">
+                                                {entry.type === "directory" ? "folder" : formatBytes(entry.size)}
+                                            </span>
+                                        </div>
+
+                                        <div class="browser-item-actions">
+                                            {#if entry.type === "directory"}
+                                                <button
+                                                    type="button"
+                                                    class="button chip"
+                                                    on:click={() => loadBrowseEntries(entry.path)}
+                                                >
+                                                    Open
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    class="button chip"
+                                                    on:click={() => chooseBrowseDirectory(entry.path)}
+                                                >
+                                                    Use
+                                                </button>
+                                            {/if}
+                                        </div>
+                                    </div>
+                                {/each}
+                            {/if}
+                        </div>
+                    {/if}
                 </div>
             </div>
 
@@ -565,6 +692,94 @@
         color: var(--secondary);
         font-family: monospace;
         font-size: 12px;
+    }
+
+    .browser-card {
+        margin-top: 10px;
+        border-radius: var(--border-radius);
+        background: var(--button);
+        padding: 10px 12px;
+        display: grid;
+        gap: 10px;
+    }
+
+    .browser-header {
+        display: grid;
+        gap: 4px;
+    }
+
+    .browser-paths {
+        display: grid;
+        gap: 2px;
+    }
+
+    .muted {
+        color: var(--gray);
+        font-size: 12px;
+    }
+
+    .muted code {
+        font-family: monospace;
+        font-size: 11px;
+        color: var(--secondary);
+    }
+
+    .browser-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+    }
+
+    .browser-list {
+        display: grid;
+        gap: 6px;
+        max-height: 220px;
+        overflow: auto;
+        padding-right: 4px;
+    }
+
+    .browser-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 8px;
+        background: var(--bg);
+        border-radius: calc(var(--border-radius) - 4px);
+        padding: 8px;
+    }
+
+    .browser-item-info {
+        min-width: 0;
+        display: grid;
+        gap: 2px;
+    }
+
+    .browser-item-name {
+        font-family: monospace;
+        font-size: 12px;
+        color: var(--secondary);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .browser-item-meta {
+        font-size: 11px;
+        color: var(--gray);
+    }
+
+    .browser-item-actions {
+        display: flex;
+        gap: 6px;
+    }
+
+    .browser-message {
+        font-size: 12px;
+        color: var(--gray);
+    }
+
+    .browser-message.error {
+        color: var(--red);
     }
 
     .modal-actions {
