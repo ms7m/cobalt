@@ -46,6 +46,8 @@ export const addToIndex = async (entry) => {
         relativePath: entry.relativePath,
         size: entry.size || 0,
         mime: entry.mime || 'application/octet-stream',
+        kind: entry.kind || 'other',
+        thumbnailPath: entry.thumbnailPath || null,
         createdAt: new Date().toISOString()
     };
     
@@ -57,6 +59,19 @@ export const addToIndex = async (entry) => {
     
     await saveIndex();
     return indexEntry;
+};
+
+export const updateIndexEntry = async (id, updates = {}) => {
+    await loadIndex();
+
+    const target = index.find((entry) => entry.id === id);
+    if (!target) {
+        return null;
+    }
+
+    Object.assign(target, updates);
+    await saveIndex();
+    return target;
 };
 
 export const getIndex = async () => {
@@ -83,7 +98,11 @@ export const listEntries = async (options = {}) => {
     const limit = options.limit || 50;
     const cursor = options.cursor || 0;
     
-    const paginated = entries.slice(cursor, cursor + limit);
+    const paginated = entries.slice(cursor, cursor + limit).map((entry) => ({
+        ...entry,
+        kind: entry.kind || 'other',
+        thumbnailPath: entry.thumbnailPath || null,
+    }));
     
     return {
         entries: paginated,
@@ -107,6 +126,7 @@ export const getFileStats = async (filePath) => {
 
 export default {
     addToIndex,
+    updateIndexEntry,
     getIndex,
     getEntryById,
     listEntries,

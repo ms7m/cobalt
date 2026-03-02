@@ -4,8 +4,10 @@ import { dirname, join } from "path";
 import { Readable } from "stream";
 import { pipeline } from "stream/promises";
 import { createWriteStream } from "fs";
+import ffmpeg from "ffmpeg-static";
+import { spawn } from "child_process";
 import { getConfig, getServiceDir } from "./config.js";
-import { addToIndex, getFileStats } from "./index.js";
+import { addToIndex, updateIndexEntry, getFileStats } from "./index.js";
 
 const sanitizeFilename = (filename) => {
     return filename
@@ -70,7 +72,144 @@ const getArchivePath = async (service, filename) => {
     };
 };
 
-export const archiveStream = async (service, filename, stream, mime = 'application/octet-stream') => {
+const coverImageExtensions = ['.jpg', '.jpeg', '.png', '.webp'];
+
+export const inferKind = (mime, filename) => {
+    const lowerName = String(filename || '').toLowerCase();
+
+    if (String(mime || '').startsWith('video/')) return 'video';
+    if (String(mime || '').startsWith('audio/')) return 'audio';
+    if (String(mime || '').startsWith('image/')) return 'image';
+
+    if (['.mp4', '.webm', '.mkv', '.mov'].some(ext => lowerName.endsWith(ext))) return 'video';
+    if (['.mp3', '.m4a', '.opus', '.ogg', '.wav', '.flac'].some(ext => lowerName.endsWith(ext))) return 'audio';
+    if (coverImageExtensions.some(ext => lowerName.endsWith(ext))) return 'image';
+
+    return 'other';
+};
+
+const thumbnailPathFor = (fullPath, relativePath) => {
+    return {
+        fullPath: `${fullPath}.thumb.jpg`,
+        relativePath: `${relativePath}.thumb.jpg`,
+    };
+};
+
+const generateVideoThumbnail = async (inputPath, outputPath) => {
+    if (!ffmpeg) return false;
+
+    return await new Promise((resolve) => {
+        const proc = spawn(ffmpeg, [
+            '-y',
+            '-ss', '00:00:01.000',
+            '-i', inputPath,
+            '-frames:v', '1',
+            '-vf', 'scale=640:-1',
+            '-q:v', '3',
+            outputPath,
+        ], { windowsHide: true, stdio: ['ignore', 'ignore', 'ignore'] });
+
+        proc.on('close', (code) => resolve(code === 0));
+        proc.on('error', () => resolve(false));
+    });
+};
+
+const extractEmbeddedAudioCover = async (inputPath, outputPath) => {
+    if (!ffmpeg) return false;
+
+    return await new Promise((resolve) => {
+        const proc = spawn(ffmpeg, [
+            '-y',
+            '-i', inputPath,
+            '-an',
+            '-frames:v', '1',
+            '-vf', 'scale=640:-1',
+            '-q:v', '3',
+            outputPath,
+        ], { windowsHide: true, stdio: ['ignore', 'ignore', 'ignore'] });
+
+        proc.on('close', (code) => resolve(code === 0));
+        proc.on('error', () => resolve(false));
+    });
+};
+
+const writeRemoteCoverThumbnail = async (coverURL, outputPath) => {
+    if (!coverURL) return false;
+
+    try {
+        const response = await fetch(coverURL);
+        if (!response.ok || !response.body) return false;
+
+        const buffer = Buffer.from(await response.arrayBuffer());
+        await writeFile(outputPath, buffer);
+        return true;
+    } catch {
+        return false;
+    }
+};
+
+const maybeGenerateThumbnail = async ({ fullPath, relativePath, mime, filename, coverURL }) => {
+    const kind = inferKind(mime, filename);
+    const thumb = thumbnailPathFor(fullPath, relativePath);
+
+    let thumbnailPath = null;
+
+    if (kind === 'video') {
+        const success = await generateVideoThumbnail(fullPath, thumb.fullPath);
+        if (success) {
+            thumbnailPath = thumb.relativePath;
+        }
+    }
+
+    if (kind === 'audio' && coverURL) {
+        const success = await writeRemoteCoverThumbnail(coverURL, thumb.fullPath);
+        if (success) {
+            thumbnailPath = thumb.relativePath;
+        }
+    }
+
+    if (kind === 'audio' && !thumbnailPath) {
+        const success = await extractEmbeddedAudioCover(fullPath, thumb.fullPath);
+        if (success) {
+            thumbnailPath = thumb.relativePath;
+        }
+    }
+
+    return {
+        kind,
+        thumbnailPath,
+    };
+};
+
+export const generateThumbnailForArchivedFile = async ({ fullPath, relativePath, mime, filename, coverURL }) => {
+    return maybeGenerateThumbnail({ fullPath, relativePath, mime, filename, coverURL });
+};
+
+const queueThumbnailGeneration = ({ entryId, fullPath, relativePath, mime, filename, coverURL }) => {
+    if (!entryId) return;
+
+    setImmediate(async () => {
+        try {
+            const media = await maybeGenerateThumbnail({
+                fullPath,
+                relativePath,
+                mime,
+                filename,
+                coverURL,
+            });
+
+            if (media.thumbnailPath) {
+                await updateIndexEntry(entryId, {
+                    thumbnailPath: media.thumbnailPath,
+                });
+            }
+        } catch {
+            // thumbnail generation is best-effort and async
+        }
+    });
+};
+
+export const archiveStream = async (service, filename, stream, mime = 'application/octet-stream', options = {}) => {
     const pathInfo = await getArchivePath(service, filename);
     if (!pathInfo) return null;
 
@@ -87,12 +226,25 @@ export const archiveStream = async (service, filename, stream, mime = 'applicati
 
         // Get file stats and add to index
         const stats = await getFileStats(fullPath);
-        await addToIndex({
+        const kind = inferKind(mime, pathInfo.filename);
+
+        const indexEntry = await addToIndex({
             service,
             filename: pathInfo.filename,
             relativePath,
             size: stats?.size || 0,
-            mime
+            mime,
+            kind,
+            thumbnailPath: null,
+        });
+
+        queueThumbnailGeneration({
+            entryId: indexEntry?.id,
+            fullPath,
+            relativePath,
+            mime,
+            filename: pathInfo.filename,
+            coverURL: options.cover,
         });
 
         return fullPath;
@@ -104,7 +256,7 @@ export const archiveStream = async (service, filename, stream, mime = 'applicati
     }
 };
 
-export const createArchiveTee = async (service, filename, responseStream, mime = 'application/octet-stream') => {
+export const createArchiveTee = async (service, filename, responseStream, mime = 'application/octet-stream', options = {}) => {
     const pathInfo = await getArchivePath(service, filename);
     if (!pathInfo) return responseStream;
 
@@ -140,12 +292,25 @@ export const createArchiveTee = async (service, filename, responseStream, mime =
             try {
                 await rename(partPath, fullPath);
                 const stats = await getFileStats(fullPath);
-                await addToIndex({
+                const kind = inferKind(mime, pathInfo.filename);
+
+                const indexEntry = await addToIndex({
                     service,
                     filename: pathInfo.filename,
                     relativePath,
                     size: stats?.size || 0,
-                    mime
+                    mime,
+                    kind,
+                    thumbnailPath: null,
+                });
+
+                queueThumbnailGeneration({
+                    entryId: indexEntry?.id,
+                    fullPath,
+                    relativePath,
+                    mime,
+                    filename: pathInfo.filename,
+                    coverURL: options.cover,
                 });
             } catch {
                 try { await unlink(partPath); } catch {}
@@ -164,7 +329,7 @@ export const createArchiveTee = async (service, filename, responseStream, mime =
     return teeStream;
 };
 
-export const archiveFFmpegOutput = async (service, filename, mime = 'application/octet-stream') => {
+export const archiveFFmpegOutput = async (service, filename, mime = 'application/octet-stream', options = {}) => {
     const pathInfo = await getArchivePath(service, filename);
     if (!pathInfo) return null;
 
@@ -196,12 +361,25 @@ export const archiveFFmpegOutput = async (service, filename, mime = 'application
                 try {
                     await rename(partPath, fullPath);
                     const stats = await getFileStats(fullPath);
-                    await addToIndex({
+                    const kind = inferKind(mime, pathInfo.filename);
+
+                    const indexEntry = await addToIndex({
                         service,
                         filename: pathInfo.filename,
                         relativePath,
                         size: stats?.size || 0,
-                        mime
+                        mime,
+                        kind,
+                        thumbnailPath: null,
+                    });
+
+                    queueThumbnailGeneration({
+                        entryId: indexEntry?.id,
+                        fullPath,
+                        relativePath,
+                        mime,
+                        filename: pathInfo.filename,
+                        coverURL: options.cover,
                     });
                     return fullPath;
                 } catch {

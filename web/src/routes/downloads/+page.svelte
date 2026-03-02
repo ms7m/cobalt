@@ -4,12 +4,16 @@
     import {
         listArchiveDownloads,
         downloadArchiveFile,
+        streamArchiveFile,
+        archiveThumbnail,
         type ArchiveEntry
     } from "$lib/api/archive";
 
     import IconDownload from "@tabler/icons-svelte/IconDownload.svelte";
     import IconFolder from "@tabler/icons-svelte/IconFolder.svelte";
     import IconRefresh from "@tabler/icons-svelte/IconRefresh.svelte";
+    import IconPlayerPlay from "@tabler/icons-svelte/IconPlayerPlay.svelte";
+    import IconX from "@tabler/icons-svelte/IconX.svelte";
 
     let entries: ArchiveEntry[] = [];
     let loading = true;
@@ -17,6 +21,7 @@
     let hasMore = false;
     let cursor = 0;
     let selectedService = "";
+    let previewEntry: ArchiveEntry | null = null;
 
     const services = ["youtube", "twitter", "instagram", "tiktok", "soundcloud", "vimeo", "reddit", "twitch", "bilibili", "other"];
 
@@ -74,6 +79,18 @@
     onMount(() => {
         loadDownloads(true);
     });
+
+    const openPreview = (entry: ArchiveEntry) => {
+        if (entry.kind !== "video" && entry.kind !== "audio") {
+            return;
+        }
+
+        previewEntry = entry;
+    };
+
+    const closePreview = () => {
+        previewEntry = null;
+    };
 </script>
 
 <svelte:head>
@@ -127,6 +144,22 @@
             <section id="downloads-list">
                 {#each entries as entry}
                     <div class="download-item">
+                        <button
+                            type="button"
+                            class="preview-thumb"
+                            on:click={() => openPreview(entry)}
+                            aria-label={`Preview ${entry.filename}`}
+                        >
+                            {#if entry.thumbnailUrl}
+                                <img src={archiveThumbnail(entry.id)} alt={entry.filename} loading="lazy" />
+                            {:else}
+                                <span>{entry.kind === "video" ? "VIDEO" : entry.kind === "audio" ? "AUDIO" : "FILE"}</span>
+                            {/if}
+                            {#if entry.kind === "video"}
+                                <span class="play-badge"><IconPlayerPlay /></span>
+                            {/if}
+                        </button>
+
                         <div class="download-info">
                             <span class="service-badge">{entry.service}</span>
                             <span class="filename">{entry.filename}</span>
@@ -155,6 +188,37 @@
                     {loading ? $t("downloads.loading") : $t("downloads.load_more")}
                 </button>
             {/if}
+        {/if}
+
+        {#if previewEntry}
+            <button type="button" class="preview-backdrop" on:click={closePreview} aria-label="Close preview"></button>
+            <div class="preview-modal" role="dialog" aria-modal="true" aria-label="Media preview">
+                <div class="preview-header">
+                    <strong>{previewEntry.filename}</strong>
+                    <button type="button" class="button icon-button" on:click={closePreview} aria-label="Close preview">
+                        <IconX />
+                    </button>
+                </div>
+
+                {#if previewEntry.kind === "video"}
+                    <video
+                        class="preview-player"
+                        controls
+                        preload="metadata"
+                        src={streamArchiveFile(previewEntry.id)}
+                    ></video>
+                {:else if previewEntry.kind === "audio"}
+                    {#if previewEntry.thumbnailUrl}
+                        <img class="preview-cover" src={archiveThumbnail(previewEntry.id)} alt={previewEntry.filename} />
+                    {/if}
+                    <audio
+                        class="preview-audio"
+                        controls
+                        preload="metadata"
+                        src={streamArchiveFile(previewEntry.id)}
+                    ></audio>
+                {/if}
+            </div>
         {/if}
     </main>
 </div>
@@ -233,6 +297,46 @@
         gap: 12px;
     }
 
+    .preview-thumb {
+        height: 64px;
+        width: 114px;
+        border: none;
+        border-radius: 10px;
+        overflow: hidden;
+        background: var(--bg);
+        color: var(--gray);
+        font-size: 11px;
+        position: relative;
+        flex-shrink: 0;
+        cursor: pointer;
+    }
+
+    .preview-thumb img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        display: block;
+    }
+
+    .play-badge {
+        position: absolute;
+        right: 6px;
+        bottom: 6px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 24px;
+        height: 24px;
+        border-radius: 999px;
+        background: color-mix(in srgb, black 60%, transparent);
+        color: white;
+    }
+
+    .play-badge :global(svg) {
+        width: 14px;
+        height: 14px;
+    }
+
     .download-info {
         display: flex;
         flex-direction: column;
@@ -273,6 +377,55 @@
         height: 20px;
     }
 
+    .preview-backdrop {
+        position: fixed;
+        inset: 0;
+        background: var(--dialog-backdrop);
+        border: none;
+        z-index: 90;
+    }
+
+    .preview-modal {
+        position: fixed;
+        z-index: 91;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: min(860px, calc(100vw - 24px));
+        background: var(--popup-bg);
+        border-radius: 14px;
+        box-shadow: 0 0 0 1px var(--popup-stroke) inset;
+        padding: 12px;
+        display: grid;
+        gap: 10px;
+    }
+
+    .preview-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+    }
+
+    .preview-player {
+        width: 100%;
+        max-height: 70vh;
+        background: black;
+        border-radius: 10px;
+    }
+
+    .preview-audio {
+        width: 100%;
+    }
+
+    .preview-cover {
+        width: 100%;
+        max-height: 55vh;
+        object-fit: contain;
+        border-radius: 10px;
+        background: var(--bg);
+    }
+
     #loading-state,
     #error-state,
     #empty-state {
@@ -305,6 +458,11 @@
 
         .download-item {
             padding: 10px 12px;
+        }
+
+        .preview-thumb {
+            width: 88px;
+            height: 56px;
         }
     }
 </style>

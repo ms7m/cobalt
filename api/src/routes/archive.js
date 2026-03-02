@@ -1,6 +1,7 @@
 import { join } from "path";
 import { createReadStream } from "fs";
 import { stat } from "fs/promises";
+import mime from "mime";
 import { getConfig, setConfig, getServiceDir, setServiceDir } from "../archive/config.js";
 import { listEntries, getEntryById } from "../archive/index.js";
 import { browseArchivePath } from "../archive/browse.js";
@@ -17,6 +18,13 @@ export const setupArchiveRoutes = (app) => {
 
         return archiveRoot;
     };
+
+    const withPublicMediaLinks = (entry) => ({
+        ...entry,
+        fileUrl: `/archive/file/${entry.id}`,
+        streamUrl: entry.kind === 'video' || entry.kind === 'audio' ? `/archive/file/${entry.id}/stream` : null,
+        thumbnailUrl: entry.thumbnailPath ? `/archive/file/${entry.id}/thumbnail` : null,
+    });
 
     // Get archive configuration
     app.get('/archive/config', async (req, res) => {
@@ -103,7 +111,8 @@ export const setupArchiveRoutes = (app) => {
             
             res.json({
                 success: true,
-                ...result
+                ...result,
+                entries: result.entries.map(withPublicMediaLinks),
             });
         } catch (error) {
             res.status(500).json({
@@ -177,6 +186,87 @@ export const setupArchiveRoutes = (app) => {
             res.status(500).json({
                 success: false,
                 error: error.message
+            });
+        }
+    });
+
+    // Stream archived file inline (supports browser video/audio playback)
+    app.get('/archive/file/:id/stream', async (req, res) => {
+        try {
+            const { id } = req.params;
+            const entry = await getEntryById(id);
+
+            if (!entry) {
+                return res.status(404).json({
+                    success: false,
+                    error: "File not found"
+                });
+            }
+
+            const archiveRoot = await resolveArchiveRoot();
+            const filePath = join(archiveRoot, entry.relativePath);
+            const stats = await stat(filePath);
+
+            const contentType = entry.mime || mime.getType(entry.filename) || 'application/octet-stream';
+            const range = req.headers.range;
+
+            if (range) {
+                const [startStr, endStr] = range.replace(/bytes=/, '').split('-');
+                const start = parseInt(startStr, 10);
+                const end = endStr ? parseInt(endStr, 10) : stats.size - 1;
+
+                if (Number.isNaN(start) || Number.isNaN(end) || start > end || end >= stats.size) {
+                    res.status(416).setHeader('Content-Range', `bytes */${stats.size}`).end();
+                    return;
+                }
+
+                res.status(206);
+                res.setHeader('Content-Range', `bytes ${start}-${end}/${stats.size}`);
+                res.setHeader('Accept-Ranges', 'bytes');
+                res.setHeader('Content-Length', end - start + 1);
+                res.setHeader('Content-Type', contentType);
+
+                createReadStream(filePath, { start, end }).pipe(res);
+                return;
+            }
+
+            res.status(200);
+            res.setHeader('Content-Type', contentType);
+            res.setHeader('Content-Length', stats.size);
+            res.setHeader('Accept-Ranges', 'bytes');
+            createReadStream(filePath).pipe(res);
+        } catch {
+            res.status(404).json({
+                success: false,
+                error: "File not found on disk"
+            });
+        }
+    });
+
+    // Serve generated thumbnail for archived entry
+    app.get('/archive/file/:id/thumbnail', async (req, res) => {
+        try {
+            const { id } = req.params;
+            const entry = await getEntryById(id);
+
+            if (!entry?.thumbnailPath) {
+                return res.status(404).json({
+                    success: false,
+                    error: "Thumbnail not found"
+                });
+            }
+
+            const archiveRoot = await resolveArchiveRoot();
+            const thumbPath = join(archiveRoot, entry.thumbnailPath);
+            const stats = await stat(thumbPath);
+
+            res.setHeader('Content-Type', 'image/jpeg');
+            res.setHeader('Content-Length', stats.size);
+            createReadStream(thumbPath).pipe(res);
+        } catch {
+            res.status(404).json({
+                success: false,
+                error: "Thumbnail not found"
             });
         }
     });

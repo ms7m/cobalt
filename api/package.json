@@ -11,6 +11,7 @@
     "scripts": {
         "start": "node src/cobalt",
         "test": "node src/util/test",
+        "archive:backfill-thumbnails": "node src/util/archive-backfill-thumbnails",
         "token:jwt": "node src/util/generate-jwt-secret"
     },
     "repository": {

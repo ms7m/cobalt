@@ -74,7 +74,12 @@ const render = async (res, streamInfo, ffargs, estimateMultiplier) => {
     };
     const mimeType = mimeTypes[ext] || 'application/octet-stream';
 
-    const archiveWriter = await archiveFFmpegOutput(streamInfo.service, streamInfo.filename, mimeType);
+    const archiveWriter = await archiveFFmpegOutput(
+        streamInfo.service,
+        streamInfo.filename,
+        mimeType,
+        { cover: streamInfo.cover }
+    );
 
     const shutdown = () => (
         killProcess(process),

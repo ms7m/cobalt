@@ -45,6 +45,9 @@ export function createStream(obj) {
 
             // url to a subtitle file
             subtitles: obj.subtitles,
+
+            // optional cover image URL from extractor metadata
+            cover: obj.cover,
         };
 
     // FIXME: this is now a Promise, but it is not awaited

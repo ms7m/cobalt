@@ -29,6 +29,7 @@
     import NotchSticker from "$components/misc/NotchSticker.svelte";
     import DialogHolder from "$components/dialog/DialogHolder.svelte";
     import ProcessingQueue from "$components/queue/ProcessingQueue.svelte";
+    import BackgroundJobsPanel from "$components/jobs/BackgroundJobsPanel.svelte";
     import UpdateNotification from "$components/misc/UpdateNotification.svelte";
 
     $: reduceMotion =
@@ -117,6 +118,7 @@
             <UpdateNotification />
         {/if}
         <ProcessingQueue />
+        <BackgroundJobsPanel />
         <div id="content">
             {#if ($turnstileEnabled && $page.url.pathname === "/") || $turnstileCreated}
                 <Turnstile />

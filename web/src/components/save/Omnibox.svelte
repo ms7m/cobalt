@@ -13,10 +13,12 @@
     import { hapticSwitch } from "$lib/haptics";
     import { updateSetting } from "$lib/state/settings";
     import { savingHandler } from "$lib/api/saving-handler";
+    import { submitBackgroundJob } from "$lib/api/background-job-handler";
     import { pasteLinkFromClipboard } from "$lib/clipboard";
     import { turnstileEnabled, turnstileSolved } from "$lib/state/turnstile";
     import { getArchiveConfig, type ArchiveConfig } from "$lib/api/archive";
     import { detectServiceFromURL, resolveArchivePath } from "$lib/archive/path-resolver";
+    import { queueVisible } from "$lib/state/queue-visibility";
 
     import type { Optional } from "$lib/types/generic";
     import type { DownloadModeOption } from "$lib/types/settings";
@@ -47,6 +49,7 @@
     let isFocused = $state(false);
     let isDisabled = $state(false);
     let isLoading = $state(false);
+    let useBackgroundMode = $state(false);
 
     let isHovered = $state(false);
 
@@ -86,6 +89,26 @@
         }
     });
 
+    const handleSubmit = async () => {
+        if (!validLink($link) || isDisabled || isLoading) {
+            return;
+        }
+
+        isLoading = true;
+
+        if (useBackgroundMode) {
+            const job = await submitBackgroundJob({ url: $link, service: detectedService || undefined });
+            if (job) {
+                $link = "";
+                queueVisible.set(true);
+            }
+        } else {
+            await savingHandler({ url: $link });
+        }
+
+        isLoading = false;
+    };
+
     const pasteClipboard = async () => {
         if ($dialogs.length > 0 || isDisabled || isLoading) {
             return;
@@ -96,13 +119,13 @@
         const pastedData = await pasteLinkFromClipboard();
         if (!pastedData) return;
 
-        const linkMatch = pastedData.match(/https?\:\/\/[^\s]+/g);
+        const linkMatch = pastedData.match(/https?:\/\/[^\s]+/g);
 
         if (linkMatch) {
             $link = linkMatch[0].split('，')[0];
 
             await tick(); // wait for button to render
-            savingHandler({ url: $link });
+            await handleSubmit();
         }
     };
 
@@ -120,7 +143,7 @@
         }
 
         if (e.key === "Enter" && validLink($link) && isFocused) {
-            savingHandler({ url: $link });
+            handleSubmit();
         }
 
         if (["Escape", "Clear"].includes(e.key) && isFocused) {
@@ -248,6 +271,16 @@
             <span id="paste-desktop-text">{$t("save.paste")}</span>
             <span id="paste-mobile-text">{$t("save.paste.long")}</span>
         </ActionButton>
+
+        <button
+            type="button"
+            id="background-mode-toggle"
+            class:active={useBackgroundMode}
+            on:click={() => (useBackgroundMode = !useBackgroundMode)}
+            title={useBackgroundMode ? "Background mode enabled" : "Background mode disabled"}
+        >
+            {useBackgroundMode ? "📥 BG" : "⚡ DL"}
+        </button>
     </div>
 </div>
 
@@ -382,6 +415,22 @@
         color: var(--gray);
         font-family: monospace;
         line-height: 1.4;
+    }
+
+    #background-mode-toggle {
+        padding: 8px 12px;
+        background: var(--button);
+        border: none;
+        border-radius: var(--border-radius);
+        font-size: 12px;
+        font-weight: 500;
+        cursor: pointer;
+        color: var(--gray);
+    }
+
+    #background-mode-toggle.active {
+        background: var(--accent);
+        color: var(--primary);
     }
 
     @media screen and (max-width: 440px) {

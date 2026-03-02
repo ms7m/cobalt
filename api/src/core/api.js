@@ -20,6 +20,7 @@ import { verifyStream } from "../stream/manage.js";
 import { createResponse, normalizeRequest, getIP } from "../processing/request.js";
 import { setupTunnelHandler } from "./itunnel.js";
 import { setupArchiveRoutes } from "../routes/archive.js";
+import { setupJobRoutes } from "../routes/jobs.js";
 
 import * as APIKeys from "../security/api-keys.js";
 import * as Cookies from "../processing/cookie/manager.js";
@@ -318,6 +319,7 @@ export const runAPI = async (express, app, __dirname, isPrimary = true) => {
     });
 
     setupArchiveRoutes(app);
+    setupJobRoutes(app);
 
     app.get('/', (_, res) => {
         res.type('json');
