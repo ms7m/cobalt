@@ -16,7 +16,7 @@ import {
 } from "./jobs.js";
 import { archiveStream } from "./writer.js";
 import { extract } from "../processing/url.js";
-import { match } from "../processing/match.js";
+import match from "../processing/match.js";
 import { getIP } from "../processing/request.js";
 
 const CONCURRENCY = Number(env.archiveJobConcurrency) || 2;

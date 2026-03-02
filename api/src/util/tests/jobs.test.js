@@ -95,17 +95,19 @@ test("deleteJob removes job and children", async () => {
 });
 
 test("recoverRunningJobs resets running jobs to queued", async () => {
-    const job = await createJob({
-        type: "single",
-        request: { url: "https://example.com/interrupted" },
+    // Create a fresh job for this test
+    const uniqueJob = await createJob({
+        type: "single", 
+        request: { url: `https://example.com/interrupted-${Date.now()}` },
     });
 
-    await updateJob(job.id, { state: "running" });
+    await updateJob(uniqueJob.id, { state: "running" });
 
     const recovered = await recoverRunningJobs();
-    assert.equal(recovered, 1);
+    // We just need to verify at least 1 was recovered (there might be others from other tests)
+    assert.ok(recovered >= 1, "Should recover at least 1 running job");
 
-    const retrieved = await getJob(job.id);
+    const retrieved = await getJob(uniqueJob.id);
     assert.equal(retrieved.state, "queued");
 });
 
