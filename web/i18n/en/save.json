@@ -24,5 +24,11 @@
     "label.community_instance": "mikka edition",
     "archive.path_hint": "detected {{ service }} -> saves to {{ path }}",
 
-    "tooltip.captcha": "cloudflare turnstile is checking if you're not a bot, please wait!"
+    "tooltip.captcha": "cloudflare turnstile is checking if you're not a bot, please wait!",
+
+    "jobs.title": "Background Downloads",
+    "jobs.empty": "No active downloads",
+    "jobs.loading": "Loading...",
+    "jobs.load_more": "Load more",
+    "jobs.open_in_downloads": "Open in Downloads"
 }
