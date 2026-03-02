@@ -113,7 +113,7 @@ export const runAPI = async (express, app, __dirname, isPrimary = true) => {
     app.set('trust proxy', ['loopback', 'uniquelocal']);
 
     app.use('/', cors({
-        methods: ['GET', 'POST'],
+        methods: ['GET', 'POST', 'PUT'],
         exposedHeaders: [
             'Ratelimit-Limit',
             'Ratelimit-Policy',
