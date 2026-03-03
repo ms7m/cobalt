@@ -1,23 +1,20 @@
 import { env } from "../config.js";
 import { fetch } from "undici";
-import { pipeline } from "stream/promises";
 import { Agent } from "undici";
 
 import {
-    getQueuedJobs,
-    setJobRunning,
+    claimNextQueuedJob,
     setJobProgress,
     setJobDone,
     setJobError,
     setJobCanceled,
     createJob,
-    getChildJobs,
     getJob,
 } from "./jobs.js";
 import { archiveStream } from "./writer-sqlite.js";
 import { extract } from "../processing/url.js";
 import match from "../processing/match.js";
-import { getIP } from "../processing/request.js";
+import { normalizeRequest } from "../processing/request.js";
 
 const CONCURRENCY = Number(env.archiveJobConcurrency) || 2;
 const agent = new Agent();
@@ -38,27 +35,24 @@ export const startScheduler = async () => {
             continue;
         }
 
-        const queued = await getQueuedJobs();
-
-        if (queued.length === 0) {
+        const claimed = await claimNextQueuedJob();
+        if (!claimed) {
             await sleep(500);
             continue;
         }
 
-        const job = queued[0];
         running++;
-        executeJob(job.id).finally(() => {
+        executeJob(claimed).finally(() => {
             running--;
         });
     }
 };
 
-const executeJob = async (jobId) => {
-    const job = await setJobRunning(jobId);
+const executeJob = async (job) => {
     if (!job) return;
 
     const abortController = new AbortController();
-    abortControllers.set(jobId, abortController);
+    abortControllers.set(job.id, abortController);
 
     try {
         const result = await processJobRequest(job, abortController.signal);
@@ -76,17 +70,22 @@ const executeJob = async (jobId) => {
         throw new Error("Unsupported response type");
     } catch (error) {
         if (abortController.signal.aborted) {
-            await setJobCanceled(jobId);
+            await setJobCanceled(job.id);
         } else {
-            await setJobError(jobId, error?.message || "Job failed");
+            await setJobError(job.id, error?.message || "Job failed");
         }
     } finally {
-        abortControllers.delete(jobId);
+        abortControllers.delete(job.id);
     }
 };
 
 const processJobRequest = async (job, signal) => {
-    const request = job.request;
+    const normalized = await normalizeRequest({ ...job.request });
+    if (!normalized.success) {
+        throw new Error("Invalid request payload");
+    }
+
+    const request = normalized.data;
 
     if (!request.url) {
         throw new Error("Missing URL");
@@ -212,6 +211,14 @@ const downloadAndArchive = async (job, result, signal) => {
     let downloadedBytes = 0;
 
     const mimeType = response.headers.get("content-type") || "application/octet-stream";
+    const contentDisposition = response.headers.get("content-disposition") || "";
+
+    if (!filename) {
+        filename =
+            parseFilenameFromContentDisposition(contentDisposition)
+            || parseFilenameFromURL(url)
+            || `download.${mimeTypeToExtension(mimeType)}`;
+    }
 
     // Create a transforming stream to track progress
     const { Readable } = await import("stream");
@@ -247,15 +254,65 @@ const downloadAndArchive = async (job, result, signal) => {
 
     // Archive the stream
     const service = job.service || "unknown";
-    const archivedPath = await archiveStream(service, filename, progressStream, mimeType, {
+    const archived = await archiveStream(service, filename, progressStream, mimeType, {
         cover: job.request?.cover,
     });
 
-    if (!archivedPath) {
+    if (!archived) {
         throw new Error("Failed to archive file");
     }
 
-    await setJobDone(job.id, null); // archiveEntryId will be set by addToIndex
+    await setJobDone(job.id, archived.entryId || null);
+};
+
+const parseFilenameFromContentDisposition = (header) => {
+    if (!header) return null;
+
+    const utf8Match = header.match(/filename\*=UTF-8''([^;]+)/i);
+    if (utf8Match?.[1]) {
+        try {
+            return decodeURIComponent(utf8Match[1].replace(/\"/g, ""));
+        } catch {
+            return utf8Match[1].replace(/\"/g, "");
+        }
+    }
+
+    const quotedMatch = header.match(/filename="([^"]+)"/i);
+    if (quotedMatch?.[1]) {
+        return quotedMatch[1];
+    }
+
+    const plainMatch = header.match(/filename=([^;]+)/i);
+    return plainMatch?.[1]?.trim() || null;
+};
+
+const parseFilenameFromURL = (rawURL) => {
+    if (!rawURL) return null;
+
+    try {
+        const parsed = new URL(rawURL);
+        const name = parsed.pathname.split("/").filter(Boolean).pop();
+        return name ? decodeURIComponent(name) : null;
+    } catch {
+        return null;
+    }
+};
+
+const mimeTypeToExtension = (mimeType) => {
+    const normalized = String(mimeType || "").split(";")[0].trim().toLowerCase();
+
+    const map = {
+        "video/mp4": "mp4",
+        "video/webm": "webm",
+        "audio/mpeg": "mp3",
+        "audio/mp4": "m4a",
+        "audio/webm": "webm",
+        "audio/ogg": "ogg",
+        "image/jpeg": "jpg",
+        "image/png": "png",
+    };
+
+    return map[normalized] || "bin";
 };
 
 export const cancelJob = async (jobId) => {

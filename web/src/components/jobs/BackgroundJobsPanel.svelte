@@ -118,16 +118,18 @@
                     </button>
 
                     {#if job.state === "running" || job.state === "queued"}
-                        <div class="progress-bar">
+                        <div class="progress-bar" class:indeterminate={!job.progress.bytesTotal}>
                             <div
                                 class="progress-fill"
-                                style:width="{job.progress.percent}%"
-                            />
+                                style:width="{job.progress.bytesTotal ? job.progress.percent : 35}%"
+                            ></div>
                         </div>
                         {#if job.progress.bytesTotal}
                             <span class="progress-text">
                                 {formatBytes(job.progress.bytesDownloaded)} / {formatBytes(job.progress.bytesTotal)}
                             </span>
+                        {:else if job.state === "running"}
+                            <span class="progress-text">processing...</span>
                         {/if}
                     {/if}
 
@@ -146,7 +148,7 @@
                                 {$t("button.retry")}
                             </button>
                         {/if}
-                        {#if job.state === "done" && job.archiveEntryId}
+                        {#if job.state === "done"}
                             <a href="/downloads" class="action-button">
                                 {$t("jobs.open_in_downloads")}
                             </a>
@@ -328,6 +330,11 @@
         transition: width 0.3s ease;
     }
 
+    .progress-bar.indeterminate .progress-fill {
+        width: 35% !important;
+        animation: panel-progress-indeterminate 1.2s ease-in-out infinite;
+    }
+
     .progress-text {
         font-size: 11px;
         color: var(--gray);
@@ -393,5 +400,14 @@
         border-radius: var(--border-radius);
         color: var(--secondary);
         cursor: pointer;
+    }
+
+    @keyframes panel-progress-indeterminate {
+        0% {
+            transform: translateX(-100%);
+        }
+        100% {
+            transform: translateX(280%);
+        }
     }
 </style>

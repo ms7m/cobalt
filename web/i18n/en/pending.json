@@ -1,0 +1,10 @@
+{
+    "title": "pending statuses",
+    "subtitle": "live view of queued and running jobs from the database",
+    "empty": "no pending jobs right now",
+    "queued": "queued",
+    "running": "running",
+    "refresh": "refresh",
+    "updated": "updated",
+    "unknown": "unknown"
+}

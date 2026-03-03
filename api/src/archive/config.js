@@ -47,9 +47,16 @@ export const getConfig = async () => {
 };
 
 export const setConfig = async (newConfig) => {
+    await loadConfig();
+
+    const updates = { ...newConfig };
+    if (typeof updates.archiveRoot === "string") {
+        updates.archiveRoot = updates.archiveRoot.trim();
+    }
+
     config = {
         ...config,
-        ...newConfig
+        ...updates
     };
     await saveConfig();
     return config;
@@ -60,6 +67,8 @@ export const getServiceDir = (service) => {
 };
 
 export const setServiceDir = async (service, dir) => {
+    await loadConfig();
+
     if (dir === null || dir === undefined || dir === service) {
         delete config.serviceDirs[service];
     } else {

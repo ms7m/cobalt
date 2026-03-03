@@ -1,6 +1,7 @@
 {
     "save": "save",
     "downloads": "downloads",
+    "pending": "pending",
     "settings": "settings",
     "updates": "updates",
     "donate": "donate",

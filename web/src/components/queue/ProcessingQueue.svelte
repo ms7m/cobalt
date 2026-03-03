@@ -29,11 +29,31 @@
     
     let hasBackgroundJobs = $derived(bgJobs.length > 0);
     let activeBgJobs = $derived(bgJobs.filter(j => j.state === 'running' || j.state === 'queued'));
+
+    const backgroundJobProgress = (job: (typeof bgJobs)[number]) => {
+        if (job.state === "queued") {
+            return null;
+        }
+
+        const percent = Number(job.progress?.percent ?? 0);
+        if (Number.isFinite(percent) && percent > 0) {
+            return Math.max(0, Math.min(100, percent)) / 100;
+        }
+
+        if ((job.progress?.bytesDownloaded || 0) > 0) {
+            return 0.05;
+        }
+
+        return 0;
+    };
     
     let totalProgress = $derived(() => {
         const localCount = queue.length;
-        const bgCount = activeBgJobs.length;
-        const totalCount = localCount + bgCount;
+        const measurableBgJobs = activeBgJobs
+            .map((job) => backgroundJobProgress(job))
+            .filter((progress): progress is number => progress !== null);
+        const measurableBgCount = measurableBgJobs.length;
+        const totalCount = localCount + measurableBgCount;
         
         if (!totalCount) return 0;
         
@@ -44,15 +64,14 @@
         }
         
         let bgProgress = 0;
-        if (bgCount) {
-            bgProgress = activeBgJobs.map(j => j.progress?.percent || 0)
-                .reduce((a, b) => a + b, 0) / (100 * bgCount);
+        if (measurableBgCount) {
+            bgProgress = measurableBgJobs.reduce((a, b) => a + b, 0) / measurableBgCount;
         }
         
-        return ((localProgress * localCount) + (bgProgress * bgCount)) / totalCount;
+        return ((localProgress * localCount) + (bgProgress * measurableBgCount)) / totalCount;
     });
 
-    let indeterminate = $derived(queue.length > 0 && totalProgress() === 0);
+    let indeterminate = $derived((queue.length > 0 || activeBgJobs.length > 0) && totalProgress() === 0);
 
     onNavigate(() => {
         $queueVisible = false;
@@ -143,10 +162,12 @@
                             </div>
                             <div class="bg-job-status">
                                 {#if job.state === 'running'}
-                                    <div class="bg-progress-bar">
-                                        <div class="bg-progress-fill" style:width="{job.progress?.percent || 0}%" />
+                                    <div class="bg-progress-bar" class:indeterminate={!job.progress?.bytesTotal}>
+                                        <div class="bg-progress-fill" style:width="{job.progress?.bytesTotal ? (job.progress?.percent || 0) : 35}%"></div>
                                     </div>
-                                    <span class="bg-progress-text">{job.progress?.percent || 0}%</span>
+                                    <span class="bg-progress-text">
+                                        {job.progress?.bytesTotal ? `${job.progress?.percent || 0}%` : "..."}
+                                    </span>
                                 {:else if job.state === 'done'}
                                     <span class="bg-status-done">✓</span>
                                 {:else if job.state === 'error'}
@@ -345,6 +366,11 @@
         transition: width 0.3s ease;
     }
 
+    .bg-progress-bar.indeterminate .bg-progress-fill {
+        width: 35% !important;
+        animation: bg-progress-indeterminate 1.2s ease-in-out infinite;
+    }
+
     .bg-progress-text {
         font-size: 10px;
         color: var(--gray);
@@ -399,6 +425,15 @@
 
     .bg-view-all:hover {
         background: var(--button-hover);
+    }
+
+    @keyframes bg-progress-indeterminate {
+        0% {
+            transform: translateX(-100%);
+        }
+        100% {
+            transform: translateX(280%);
+        }
     }
 
     @media screen and (max-width: 535px) {

@@ -268,7 +268,10 @@ export const archiveStream = async (service, filename, stream, mime = 'applicati
             coverURL: options.cover,
         });
 
-        return fullPath;
+        return {
+            fullPath,
+            entryId: indexEntry?.id || null,
+        };
     } catch (error) {
         try {
             await unlink(partPath);

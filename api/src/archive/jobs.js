@@ -231,9 +231,18 @@ export const setJobRunning = async (id) => {
 };
 
 export const setJobProgress = async (id, bytesDownloaded, bytesTotal) => {
-    const percent = bytesTotal ? Math.round((bytesDownloaded / bytesTotal) * 100) : 0;
+    const safeDownloaded = Math.max(0, Number(bytesDownloaded) || 0);
+    const safeTotal = Number.isFinite(bytesTotal) && bytesTotal > 0 ? Number(bytesTotal) : null;
+
+    let percent = 0;
+    if (safeTotal) {
+        percent = Math.round((safeDownloaded / safeTotal) * 100);
+    }
+
+    percent = Math.max(0, Math.min(100, percent));
+
     const job = await updateJob(id, {
-        progress: { bytesDownloaded, bytesTotal, percent },
+        progress: { bytesDownloaded: safeDownloaded, bytesTotal: safeTotal, percent },
     });
     const broadcast = await getBroadcast();
     if (broadcast) broadcast(job);
@@ -241,7 +250,19 @@ export const setJobProgress = async (id, bytesDownloaded, bytesTotal) => {
 };
 
 export const setJobDone = async (id, archiveEntryId) => {
-    const job = await updateJob(id, { state: "done", archiveEntryId });
+    const existing = await getJob(id);
+    const total = existing?.progress?.bytesTotal;
+    const downloaded = existing?.progress?.bytesDownloaded || 0;
+
+    const job = await updateJob(id, {
+        state: "done",
+        archiveEntryId,
+        progress: {
+            bytesDownloaded: total || downloaded,
+            bytesTotal: total || downloaded || null,
+            percent: 100,
+        },
+    });
     const broadcast = await getBroadcast();
     if (broadcast) broadcast(job);
     return job;
@@ -294,6 +315,42 @@ export const getQueuedJobs = async () => {
     return rows.map(rowToJob);
 };
 
+export const claimNextQueuedJob = async () => {
+    const database = getDb();
+    const now = new Date().toISOString();
+
+    const claim = database.transaction(() => {
+        const next = database
+            .prepare("SELECT id FROM jobs WHERE state = 'queued' ORDER BY created_at ASC LIMIT 1")
+            .get();
+
+        if (!next?.id) {
+            return null;
+        }
+
+        const result = database
+            .prepare("UPDATE jobs SET state = 'running', updated_at = ? WHERE id = ? AND state = 'queued'")
+            .run(now, next.id);
+
+        if (result.changes === 0) {
+            return null;
+        }
+
+        return database.prepare("SELECT * FROM jobs WHERE id = ?").get(next.id);
+    });
+
+    const claimed = rowToJob(claim());
+
+    if (claimed) {
+        const broadcast = await getBroadcast();
+        if (broadcast) {
+            broadcast(claimed);
+        }
+    }
+
+    return claimed;
+};
+
 export const recoverRunningJobs = async () => {
     const database = getDb();
     
@@ -325,6 +382,7 @@ export default {
     getChildJobs,
     getRunningJobs,
     getQueuedJobs,
+    claimNextQueuedJob,
     recoverRunningJobs,
     forceFlush,
 };
