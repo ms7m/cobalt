@@ -25,6 +25,36 @@ let abortControllers = new Map();
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+const verboseLog = (...args) => {
+    if (env.archiveVerbose) {
+        console.log("[archive-worker]", ...args);
+    }
+};
+
+const toProcessingRequest = (request) => {
+    const source = request || {};
+
+    return {
+        url: source.url,
+        audioBitrate: source.audioBitrate,
+        audioFormat: source.audioFormat,
+        downloadMode: source.downloadMode,
+        filenameStyle: source.filenameStyle,
+        youtubeVideoCodec: source.youtubeVideoCodec,
+        youtubeVideoContainer: source.youtubeVideoContainer,
+        videoQuality: source.videoQuality,
+        youtubeDubLang: source.youtubeDubLang,
+        subtitleLang: source.subtitleLang,
+        disableMetadata: source.disableMetadata,
+        allowH265: source.allowH265,
+        convertGif: source.convertGif,
+        tiktokFullAudio: source.tiktokFullAudio,
+        alwaysProxy: source.alwaysProxy,
+        youtubeHLS: source.youtubeHLS,
+        youtubeBetterAudio: source.youtubeBetterAudio,
+    };
+};
+
 export const startScheduler = async () => {
     if (scheduled) return;
     scheduled = true;
@@ -41,6 +71,12 @@ export const startScheduler = async () => {
             continue;
         }
 
+        verboseLog("Claimed job", {
+            id: claimed.id,
+            service: claimed.service,
+            type: claimed.type,
+        });
+
         running++;
         executeJob(claimed).finally(() => {
             running--;
@@ -51,6 +87,12 @@ export const startScheduler = async () => {
 const executeJob = async (job) => {
     if (!job) return;
 
+    verboseLog("Starting job", {
+        id: job.id,
+        service: job.service,
+        filename: job.filename,
+    });
+
     const abortController = new AbortController();
     abortControllers.set(job.id, abortController);
 
@@ -58,11 +100,21 @@ const executeJob = async (job) => {
         const result = await processJobRequest(job, abortController.signal);
 
         if (result.type === "picker") {
+            verboseLog("Expanding picker job", {
+                id: job.id,
+                pickerItems: result.picker?.length || 0,
+                hasAudio: !!result.audio,
+            });
             await handlePickerExpansion(job, result);
             return;
         }
 
         if (result.type === "redirect" || result.type === "tunnel") {
+            verboseLog("Downloading job", {
+                id: job.id,
+                type: result.type,
+                hasFilename: !!result.filename,
+            });
             await downloadAndArchive(job, result, abortController.signal);
             return;
         }
@@ -70,8 +122,13 @@ const executeJob = async (job) => {
         throw new Error("Unsupported response type");
     } catch (error) {
         if (abortController.signal.aborted) {
+            verboseLog("Canceled job", { id: job.id });
             await setJobCanceled(job.id);
         } else {
+            verboseLog("Failed job", {
+                id: job.id,
+                error: error?.message || "Job failed",
+            });
             await setJobError(job.id, error?.message || "Job failed");
         }
     } finally {
@@ -80,7 +137,7 @@ const executeJob = async (job) => {
 };
 
 const processJobRequest = async (job, signal) => {
-    const normalized = await normalizeRequest({ ...job.request });
+    const normalized = await normalizeRequest(toProcessingRequest(job.request));
     if (!normalized.success) {
         throw new Error("Invalid request payload");
     }
@@ -263,6 +320,12 @@ const downloadAndArchive = async (job, result, signal) => {
     }
 
     await setJobDone(job.id, archived.entryId || null);
+
+    verboseLog("Completed job", {
+        id: job.id,
+        entryId: archived.entryId || null,
+        path: archived.fullPath,
+    });
 };
 
 const parseFilenameFromContentDisposition = (header) => {

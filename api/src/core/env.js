@@ -126,6 +126,7 @@ export const loadEnvs = (env = process.env) => {
 
         // NAS archival configuration
         mediaArchiveRoot: env.MEDIA_ARCHIVE_ROOT || '',
+        archiveVerbose: env.ARCHIVE_VERBOSE === '1' || env.API_VERBOSE === '1',
 
         envFile: env.API_ENV_FILE,
         envRemoteReloadInterval: 300,

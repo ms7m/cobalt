@@ -196,6 +196,28 @@ export interface ArchiveJobListResponse {
     activeCount: number;
 }
 
+export interface ArchiveJobDiagnostics {
+    success: boolean;
+    timestamp: string;
+    verbose: boolean;
+    activeWorkers: number;
+    counts: {
+        queued: number;
+        running: number;
+        done: number;
+        canceled: number;
+        error: number;
+    };
+    recentErrors: Array<{
+        id: string;
+        service: string | null;
+        filename: string | null;
+        error: string | null;
+        state: string;
+        updatedAt: string;
+    }>;
+}
+
 export const createBackgroundJob = async (request: {
     url: string;
     service?: string;
@@ -254,6 +276,19 @@ export const getBackgroundJob = async (id: string): Promise<{ success: boolean; 
             return { success: true, job: data.job };
         }
         return { success: false, error: data.error };
+    } catch {
+        return null;
+    }
+};
+
+export const getBackgroundJobDiagnostics = async (): Promise<ArchiveJobDiagnostics | null> => {
+    try {
+        const response = await fetch(`${currentApiURL()}/archive/jobs/diagnostics`);
+        const data = await response.json();
+        if (data.success) {
+            return data;
+        }
+        return null;
     } catch {
         return null;
     }
@@ -321,6 +356,7 @@ export default {
     archiveThumbnail,
     createBackgroundJob,
     listBackgroundJobs,
+    getBackgroundJobDiagnostics,
     getBackgroundJob,
     cancelBackgroundJob,
     retryBackgroundJob,

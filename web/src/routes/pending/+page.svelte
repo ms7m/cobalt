@@ -1,7 +1,12 @@
 <script lang="ts">
     import { onMount } from "svelte";
     import { t } from "$lib/i18n/translations";
-    import { listBackgroundJobs, type ArchiveJob } from "$lib/api/archive";
+    import {
+        listBackgroundJobs,
+        getBackgroundJobDiagnostics,
+        type ArchiveJob,
+        type ArchiveJobDiagnostics,
+    } from "$lib/api/archive";
 
     import IconRefresh from "@tabler/icons-svelte/IconRefresh.svelte";
 
@@ -10,6 +15,7 @@
     let loading = true;
     let error: string | null = null;
     let pendingJobs: ArchiveJob[] = [];
+    let diagnostics: ArchiveJobDiagnostics | null = null;
     let lastUpdated = "";
     let pollHandle: ReturnType<typeof setInterval> | null = null;
 
@@ -47,6 +53,8 @@
                 listBackgroundJobs({ state: "queued", limit: 100 }),
                 listBackgroundJobs({ state: "running", limit: 100 }),
             ]);
+
+            diagnostics = await getBackgroundJobDiagnostics();
 
             const all = [...(running?.jobs || []), ...(queued?.jobs || [])];
             pendingJobs = all.sort((a, b) => +new Date(b.updatedAt) - +new Date(a.updatedAt));
@@ -89,6 +97,36 @@
 
         {#if lastUpdated}
             <p class="updated-at">{$t("pending.updated")}: {formatDate(lastUpdated)}</p>
+        {/if}
+
+        {#if diagnostics}
+            <section class="diagnostics-grid">
+                <article class="card">
+                    <strong>{$t("pending.workers")}</strong>
+                    <p>{diagnostics.activeWorkers}</p>
+                </article>
+                <article class="card">
+                    <strong>{$t("pending.verbose")}</strong>
+                    <p>{diagnostics.verbose ? "on" : "off"}</p>
+                </article>
+                <article class="card">
+                    <strong>{$t("pending.counts")}</strong>
+                    <p>q:{diagnostics.counts.queued} r:{diagnostics.counts.running} d:{diagnostics.counts.done} e:{diagnostics.counts.error}</p>
+                </article>
+            </section>
+
+            {#if diagnostics.recentErrors.length > 0}
+                <section class="card">
+                    <strong>{$t("pending.recent_errors")}</strong>
+                    <div class="error-list">
+                        {#each diagnostics.recentErrors as failed}
+                            <p>
+                                [{formatDate(failed.updatedAt)}] {failed.service || $t("pending.unknown")}: {failed.error || "unknown error"}
+                            </p>
+                        {/each}
+                    </div>
+                </section>
+            {/if}
         {/if}
 
         {#if loading && pendingJobs.length === 0}
@@ -192,6 +230,35 @@
         background: var(--button);
     }
 
+    .diagnostics-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 10px;
+    }
+
+    .diagnostics-grid .card {
+        display: grid;
+        gap: 6px;
+    }
+
+    .diagnostics-grid p {
+        margin: 0;
+        color: var(--gray);
+        font-size: 12px;
+    }
+
+    .error-list {
+        margin-top: 8px;
+        display: grid;
+        gap: 6px;
+    }
+
+    .error-list p {
+        margin: 0;
+        font-size: 12px;
+        color: var(--gray);
+    }
+
     .card.error {
         color: var(--red);
         background: color-mix(in srgb, var(--red) 10%, var(--button));
@@ -281,6 +348,10 @@
         .pending-header {
             flex-direction: column;
             align-items: flex-start;
+        }
+
+        .diagnostics-grid {
+            grid-template-columns: 1fr;
         }
     }
 </style>

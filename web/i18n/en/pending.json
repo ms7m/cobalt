@@ -6,5 +6,9 @@
     "running": "running",
     "refresh": "refresh",
     "updated": "updated",
-    "unknown": "unknown"
+    "unknown": "unknown",
+    "workers": "active workers",
+    "verbose": "verbose logging",
+    "counts": "job counts",
+    "recent_errors": "recent errors"
 }

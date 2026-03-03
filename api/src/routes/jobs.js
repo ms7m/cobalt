@@ -11,8 +11,15 @@ import {
 } from "../archive/jobs.js";
 import { cancelJob, startScheduler, getActiveJobCount } from "../archive/scheduler.js";
 import { env } from "../config.js";
+import { normalizeRequest } from "../processing/request.js";
 
 const sseClients = new Map();
+
+const verboseLog = (...args) => {
+    if (env.archiveVerbose) {
+        console.log("[archive-jobs]", ...args);
+    }
+};
 
 const broadcastJobUpdate = (job) => {
     const data = JSON.stringify({ type: "jobUpdate", job });
@@ -42,11 +49,34 @@ export const setupJobRoutes = (app) => {
                 });
             }
 
+            const processingRequest = { ...request };
+            delete processingRequest.service;
+            delete processingRequest.filename;
+            const normalized = await normalizeRequest(processingRequest);
+
+            if (!normalized.success) {
+                verboseLog("Rejected invalid background job request", {
+                    url: request.url,
+                    service: request.service || null,
+                });
+
+                return res.status(400).json({
+                    success: false,
+                    error: "Invalid background job request",
+                });
+            }
+
             const job = await createJob({
                 type: "single",
-                request,
+                request: normalized.data,
                 service: request.service || null,
                 filename: request.filename || null,
+            });
+
+            verboseLog("Created job", {
+                id: job.id,
+                service: job.service,
+                state: job.state,
             });
 
             res.status(201).json({
@@ -97,6 +127,46 @@ export const setupJobRoutes = (app) => {
             res.status(500).json({
                 success: false,
                 error: error?.message || "Failed to list jobs",
+            });
+        }
+    });
+
+    // Diagnostics endpoint for troubleshooting worker/job failures
+    app.get("/archive/jobs/diagnostics", async (req, res) => {
+        try {
+            const [queued, running, done, canceled, failed] = await Promise.all([
+                getJobs({ state: "queued", limit: 1, cursor: 0 }),
+                getJobs({ state: "running", limit: 1, cursor: 0 }),
+                getJobs({ state: "done", limit: 1, cursor: 0 }),
+                getJobs({ state: "canceled", limit: 1, cursor: 0 }),
+                getJobs({ state: "error", limit: 20, cursor: 0 }),
+            ]);
+
+            res.json({
+                success: true,
+                timestamp: new Date().toISOString(),
+                verbose: !!env.archiveVerbose,
+                activeWorkers: getActiveJobCount(),
+                counts: {
+                    queued: queued.total,
+                    running: running.total,
+                    done: done.total,
+                    canceled: canceled.total,
+                    error: failed.total,
+                },
+                recentErrors: failed.jobs.slice(0, 10).map((job) => ({
+                    id: job.id,
+                    service: job.service,
+                    filename: job.filename,
+                    error: job.error,
+                    state: job.state,
+                    updatedAt: job.updatedAt,
+                })),
+            });
+        } catch (error) {
+            res.status(500).json({
+                success: false,
+                error: error?.message || "Failed to load diagnostics",
             });
         }
     });
@@ -168,6 +238,8 @@ export const setupJobRoutes = (app) => {
 
             await forceFlush();
 
+            verboseLog("Canceled job", { id });
+
             res.json({
                 success: true,
                 message: "Job canceled",
@@ -208,6 +280,8 @@ export const setupJobRoutes = (app) => {
             });
 
             broadcastJobUpdate(updated);
+
+            verboseLog("Retried job", { id });
 
             res.json({
                 success: true,
