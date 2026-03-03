@@ -15,6 +15,7 @@ import { archiveStream } from "./writer-sqlite.js";
 import { extract } from "../processing/url.js";
 import match from "../processing/match.js";
 import { normalizeRequest } from "../processing/request.js";
+import { verifyStream, getInternalTunnelFromURL, destroyInternalStream } from "../stream/manage.js";
 
 const CONCURRENCY = Number(env.archiveJobConcurrency) || 2;
 const agent = new Agent();
@@ -245,87 +246,108 @@ const downloadAndArchive = async (job, result, signal) => {
     let url = result.url;
     let filename = result.filename;
     let headers = result.headers || {};
+    let dispatcher = agent;
+    let cleanupLink = null;
 
-    // For tunnel URLs, we need to resolve them first
     if (result.type === "tunnel") {
-        // The tunnel URL is already a full cobalt tunnel URL
-        // We need to fetch it server-side
-        url = result.url;
+        const directSource = await resolveTunnelToDirectSource(result.url);
+        url = directSource.url;
+        headers = { ...headers, ...directSource.headers };
+        dispatcher = directSource.dispatcher || agent;
+        cleanupLink = directSource.cleanupLink;
+
+        verboseLog("Resolved tunnel to direct source", {
+            id: job.id,
+            from: result.url,
+            to: url,
+        });
     }
 
-    const response = await fetch(url, {
-        headers,
-        signal,
-        dispatcher: agent,
-    });
-
-    if (!response.ok) {
-        throw new Error(`Download failed: ${response.status}`);
-    }
-
-    const contentLength = response.headers.get("content-length");
-    const totalBytes = contentLength ? parseInt(contentLength, 10) : null;
-    let downloadedBytes = 0;
-
-    const mimeType = response.headers.get("content-type") || "application/octet-stream";
-    const contentDisposition = response.headers.get("content-disposition") || "";
-
-    if (!filename) {
-        filename =
-            parseFilenameFromContentDisposition(contentDisposition)
-            || parseFilenameFromURL(url)
-            || `download.${mimeTypeToExtension(mimeType)}`;
-    }
-
-    // Create a transforming stream to track progress
-    const { Readable } = await import("stream");
-
-    const progressStream = new Readable({
-        read() {},
-    });
-
-    const originalBody = response.body;
-    const reader = originalBody.getReader();
-
-    const trackProgress = async () => {
-        try {
-            while (true) {
-                const { done, value } = await reader.read();
-                if (done) {
-                    progressStream.push(null);
-                    break;
-                }
-                downloadedBytes += value.length;
-                progressStream.push(value);
-
-                if (totalBytes) {
-                    await setJobProgress(job.id, downloadedBytes, totalBytes);
-                }
-            }
-        } catch (error) {
-            progressStream.destroy(error);
+    let response;
+    try {
+        response = await fetch(url, {
+            headers,
+            signal,
+            dispatcher,
+        });
+    } catch (error) {
+        if (cleanupLink) {
+            destroyInternalStream(cleanupLink);
         }
-    };
-
-    trackProgress();
-
-    // Archive the stream
-    const service = job.service || "unknown";
-    const archived = await archiveStream(service, filename, progressStream, mimeType, {
-        cover: job.request?.cover,
-    });
-
-    if (!archived) {
-        throw new Error("Failed to archive file");
+        throw new Error(`Download fetch failed: ${describeFetchError(error)}`);
     }
 
-    await setJobDone(job.id, archived.entryId || null);
+    try {
+        if (!response.ok) {
+            throw new Error(`Download failed: ${response.status}`);
+        }
 
-    verboseLog("Completed job", {
-        id: job.id,
-        entryId: archived.entryId || null,
-        path: archived.fullPath,
-    });
+        const contentLength = response.headers.get("content-length");
+        const totalBytes = contentLength ? parseInt(contentLength, 10) : null;
+        let downloadedBytes = 0;
+
+        const mimeType = response.headers.get("content-type") || "application/octet-stream";
+        const contentDisposition = response.headers.get("content-disposition") || "";
+
+        if (!filename) {
+            filename =
+                parseFilenameFromContentDisposition(contentDisposition)
+                || parseFilenameFromURL(url)
+                || `download.${mimeTypeToExtension(mimeType)}`;
+        }
+
+        const { Readable } = await import("stream");
+
+        const progressStream = new Readable({
+            read() {},
+        });
+
+        const originalBody = response.body;
+        const reader = originalBody.getReader();
+
+        const trackProgress = async () => {
+            try {
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) {
+                        progressStream.push(null);
+                        break;
+                    }
+                    downloadedBytes += value.length;
+                    progressStream.push(value);
+
+                    if (totalBytes) {
+                        await setJobProgress(job.id, downloadedBytes, totalBytes);
+                    }
+                }
+            } catch (error) {
+                progressStream.destroy(error);
+            }
+        };
+
+        trackProgress();
+
+        const service = job.service || "unknown";
+        const archived = await archiveStream(service, filename, progressStream, mimeType, {
+            cover: job.request?.cover,
+        });
+
+        if (!archived) {
+            throw new Error("Failed to archive file");
+        }
+
+        await setJobDone(job.id, archived.entryId || null);
+
+        verboseLog("Completed job", {
+            id: job.id,
+            entryId: archived.entryId || null,
+            path: archived.fullPath,
+        });
+    } finally {
+        if (cleanupLink) {
+            destroyInternalStream(cleanupLink);
+        }
+    }
 };
 
 const parseFilenameFromContentDisposition = (header) => {
@@ -376,6 +398,52 @@ const mimeTypeToExtension = (mimeType) => {
     };
 
     return map[normalized] || "bin";
+};
+
+const describeFetchError = (error) => {
+    if (!error) return "fetch failed";
+
+    const cause = error.cause;
+    if (cause?.code || cause?.message) {
+        return `${error.message} (${cause.code || "cause"}: ${cause.message || "unknown"})`;
+    }
+
+    return error.message || "fetch failed";
+};
+
+const resolveTunnelToDirectSource = async (tunnelURL) => {
+    let parsed;
+    try {
+        parsed = new URL(tunnelURL);
+    } catch {
+        throw new Error("Invalid tunnel URL");
+    }
+
+    const id = parsed.searchParams.get("id") || "";
+    const exp = parsed.searchParams.get("exp") || "";
+    const sig = parsed.searchParams.get("sig") || "";
+    const sec = parsed.searchParams.get("sec") || "";
+    const iv = parsed.searchParams.get("iv") || "";
+
+    const streamInfo = await verifyStream(id, sig, exp, sec, iv);
+    if (!streamInfo?.urls) {
+        throw new Error(`Unable to resolve tunnel stream (status ${streamInfo?.status || "unknown"})`);
+    }
+
+    const tunnelLinks = [streamInfo.urls].flat();
+    const internalLink = tunnelLinks[0];
+    const internal = getInternalTunnelFromURL(internalLink);
+
+    if (!internal?.url) {
+        throw new Error("Unable to resolve internal tunnel source");
+    }
+
+    return {
+        url: internal.url,
+        headers: internal.headers ? Object.fromEntries(internal.headers) : {},
+        dispatcher: internal.dispatcher,
+        cleanupLink: internalLink,
+    };
 };
 
 export const cancelJob = async (jobId) => {
