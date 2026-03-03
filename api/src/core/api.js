@@ -19,7 +19,7 @@ import { friendlyServiceName } from "../processing/service-alias.js";
 import { verifyStream } from "../stream/manage.js";
 import { createResponse, normalizeRequest, getIP } from "../processing/request.js";
 import { setupTunnelHandler } from "./itunnel.js";
-import { setupArchiveRoutes } from "../routes/archive.js";
+import { setupArchiveRoutes } from "../routes/archive-sqlite.js";
 import { setupJobRoutes } from "../routes/jobs.js";
 
 import * as APIKeys from "../security/api-keys.js";

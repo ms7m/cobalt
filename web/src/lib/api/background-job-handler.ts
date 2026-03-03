@@ -78,8 +78,8 @@ export const submitBackgroundJob = async ({ url, service }: BackgroundJobArgs): 
 
     downloadButtonState.set("done");
 
-    // Track the job and show success notification
-    backgroundJobs.trackJobId(result.job.id);
+    // Add job to store immediately so it appears in the queue
+    backgroundJobs.addJob(result.job);
 
     createDialog({
         id: "job-submitted",

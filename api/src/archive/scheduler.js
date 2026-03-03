@@ -14,7 +14,7 @@ import {
     getChildJobs,
     getJob,
 } from "./jobs.js";
-import { archiveStream } from "./writer.js";
+import { archiveStream } from "./writer-sqlite.js";
 import { extract } from "../processing/url.js";
 import match from "../processing/match.js";
 import { getIP } from "../processing/request.js";

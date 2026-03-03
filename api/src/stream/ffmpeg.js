@@ -6,7 +6,7 @@ import { env } from "../config.js";
 import { destroyInternalStream } from "./manage.js";
 import { hlsExceptions } from "../processing/service-config.js";
 import { closeResponse, pipe, estimateTunnelLength, estimateAudioMultiplier } from "./shared.js";
-import { archiveFFmpegOutput } from "../archive/writer.js";
+import { archiveFFmpegOutput } from "../archive/writer-sqlite.js";
 
 const metadataTags = new Set([
     "album",

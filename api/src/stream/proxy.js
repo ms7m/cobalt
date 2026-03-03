@@ -3,7 +3,7 @@ import { create as contentDisposition } from "content-disposition-header";
 
 import { destroyInternalStream } from "./manage.js";
 import { getHeaders, closeRequest, closeResponse, pipe } from "./shared.js";
-import { createArchiveTee } from "../archive/writer.js";
+import { createArchiveTee } from "../archive/writer-sqlite.js";
 
 const defaultAgent = new Agent();
 

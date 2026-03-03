@@ -122,7 +122,8 @@ Now all SoundCloud downloads go to `/archive/music/` instead of `/archive/soundc
 | `API_URL` | Required | Your NAS URL with port |
 | `MEDIA_ARCHIVE_ROOT` | `/archive` | Where downloads are saved |
 | `ARCHIVE_CONFIG_PATH` | `/config/archive-config.json` | Archive settings file |
-| `ARCHIVE_INDEX_PATH` | `/config/archive-index.jsonl` | Download history index |
+| `ARCHIVE_INDEX_DB` | `/config/archive-index.db` | Download history and thumbnails (SQLite) |
+| `ARCHIVE_JOBS_DB` | `/config/archive-jobs.db` | Background jobs database (SQLite) |
 | `DURATION_LIMIT` | `10800` | Max video duration (seconds) |
 | `API_INSTANCE_COUNT` | `1` | Number of worker processes |
 
@@ -137,7 +138,8 @@ Now all SoundCloud downloads go to `/archive/music/` instead of `/archive/soundc
 The following data persists across container restarts:
 
 - **Archive Config**: `/config/archive-config.json`
-- **Download History**: `/config/archive-index.jsonl`
+- **Download History & Thumbnails**: `/config/archive-index.db` (SQLite database - includes thumbnail images as binary blobs)
+- **Background Jobs**: `/config/archive-jobs.db` (SQLite database - enables multi-device access)
 - **Actual Downloads**: Your configured archive directory
 - **Cookies** (if enabled): `/config/cookies.json`
 

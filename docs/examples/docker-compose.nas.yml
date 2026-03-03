@@ -39,7 +39,9 @@ services:
       
       # Optional: Custom paths for persistent config files
       ARCHIVE_CONFIG_PATH: "/config/archive-config.json"
-      ARCHIVE_INDEX_PATH: "/config/archive-index.jsonl"
+      # SQLite databases for archive index and thumbnails, plus background job tracking
+      ARCHIVE_INDEX_DB: "/config/archive-index.db"
+      ARCHIVE_JOBS_DB: "/config/archive-jobs.db"
       
       # Optional: Cookie support for authenticated downloads
       # COOKIE_PATH: "/config/cookies.json"

@@ -60,6 +60,21 @@ const createJobsStore = () => {
         saveTrackedIds();
     };
 
+    const addJob = (job: ArchiveJob) => {
+        update((state) => {
+            // Check if job already exists
+            if (state.jobs.find((j) => j.id === job.id)) {
+                return state;
+            }
+            trackJobId(job.id);
+            return {
+                ...state,
+                jobs: [job, ...state.jobs],
+                total: state.total + 1,
+            };
+        });
+    };
+
     const untrackJobId = (id: string) => {
         trackedJobIds.delete(id);
         saveTrackedIds();
@@ -167,6 +182,7 @@ const createJobsStore = () => {
         updateJobInState,
         trackJobId,
         untrackJobId,
+        addJob,
         connectSSE,
         disconnect,
         startPolling,
