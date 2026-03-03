@@ -119,7 +119,6 @@
                 <SectionHeading
                     title={$t("queue.title")}
                     sectionId="queue"
-                    beta
                     nolink
                 />
                 <div class="header-buttons">
@@ -148,7 +147,7 @@
                 <div class="bg-jobs-section">
                     <div class="bg-jobs-header">
                         <IconCloud />
-                        <span>NAS Downloads</span>
+                        <span>Background jobs</span>
                         {#if activeBgJobs.length > 0}
                             <span class="bg-badge">{activeBgJobs.length}</span>
                         {/if}
@@ -166,7 +165,9 @@
                                         <div class="bg-progress-fill" style:width="{job.progress?.bytesTotal ? (job.progress?.percent || 0) : 35}%"></div>
                                     </div>
                                     <span class="bg-progress-text">
-                                        {job.progress?.bytesTotal ? `${job.progress?.percent || 0}%` : "..."}
+                                        {job.progress?.bytesTotal
+                                            ? `${job.progress?.percent || 0}%`
+                                            : formatBytes(job.progress?.bytesDownloaded || 0)}
                                     </span>
                                 {:else if job.state === 'done'}
                                     <span class="bg-status-done">✓</span>
@@ -312,14 +313,15 @@
     .bg-job-item {
         display: flex;
         flex-direction: column;
-        gap: 4px;
-        padding: 8px 12px;
+        gap: 8px;
+        padding: 10px 12px;
         background: var(--button);
-        border-radius: 8px;
+        border-radius: 10px;
+        border: 1px solid color-mix(in srgb, var(--popup-stroke) 60%, transparent);
     }
 
     .bg-job-item.done {
-        opacity: 0.7;
+        opacity: 0.82;
     }
 
     .bg-job-item.error {
@@ -329,17 +331,19 @@
     .bg-job-info {
         display: flex;
         flex-direction: column;
-        gap: 2px;
+        gap: 3px;
     }
 
     .bg-job-service {
         font-size: 10px;
         text-transform: uppercase;
         color: var(--gray);
+        letter-spacing: 0.04em;
     }
 
     .bg-job-filename {
-        font-size: 12px;
+        font-size: 13px;
+        font-weight: 500;
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
@@ -349,14 +353,14 @@
         display: flex;
         align-items: center;
         gap: 8px;
-        margin-top: 4px;
+        margin-top: 2px;
     }
 
     .bg-progress-bar {
         flex: 1;
-        height: 3px;
+        height: 5px;
         background: var(--bg);
-        border-radius: 2px;
+        border-radius: 999px;
         overflow: hidden;
     }
 
@@ -372,9 +376,9 @@
     }
 
     .bg-progress-text {
-        font-size: 10px;
+        font-size: 11px;
         color: var(--gray);
-        min-width: 32px;
+        min-width: 48px;
         text-align: right;
     }
 

@@ -162,7 +162,9 @@
 
                         <div class="download-info">
                             <span class="service-badge">{entry.service}</span>
-                            <span class="filename">{entry.filename}</span>
+                            <button type="button" class="filename" on:click={() => openPreview(entry)}>
+                                {entry.filename}
+                            </button>
                             <div class="meta">
                                 <span class="size">{formatFileSize(entry.size)}</span>
                                 <span class="date">{formatDate(entry.createdAt)}</span>
@@ -218,6 +220,10 @@
                         src={streamArchiveFile(previewEntry.id)}
                     ></audio>
                 {/if}
+
+                <a class="button preview-open-source" href={streamArchiveFile(previewEntry.id)} target="_blank" rel="noreferrer">
+                    open stream source
+                </a>
             </div>
         {/if}
     </main>
@@ -358,6 +364,12 @@
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
+        border: none;
+        background: none;
+        color: inherit;
+        text-align: left;
+        padding: 0;
+        cursor: pointer;
     }
 
     .meta {
@@ -424,6 +436,10 @@
         object-fit: contain;
         border-radius: 10px;
         background: var(--bg);
+    }
+
+    .preview-open-source {
+        justify-self: start;
     }
 
     #loading-state,

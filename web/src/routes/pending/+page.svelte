@@ -15,6 +15,7 @@
     let loading = true;
     let error: string | null = null;
     let pendingJobs: ArchiveJob[] = [];
+    let recentJobs: ArchiveJob[] = [];
     let diagnostics: ArchiveJobDiagnostics | null = null;
     let lastUpdated = "";
     let pollHandle: ReturnType<typeof setInterval> | null = null;
@@ -49,15 +50,23 @@
         error = null;
 
         try {
-            const [queued, running] = await Promise.all([
+            const [queued, running, done, failed] = await Promise.all([
                 listBackgroundJobs({ state: "queued", limit: 100 }),
                 listBackgroundJobs({ state: "running", limit: 100 }),
+                listBackgroundJobs({ state: "done", limit: 30 }),
+                listBackgroundJobs({ state: "error", limit: 30 }),
             ]);
 
             diagnostics = await getBackgroundJobDiagnostics();
 
             const all = [...(running?.jobs || []), ...(queued?.jobs || [])];
             pendingJobs = all.sort((a, b) => +new Date(b.updatedAt) - +new Date(a.updatedAt));
+
+            const recent = [...(done?.jobs || []), ...(failed?.jobs || [])]
+                .sort((a, b) => +new Date(b.updatedAt) - +new Date(a.updatedAt))
+                .slice(0, 8);
+            recentJobs = recent;
+
             lastUpdated = new Date().toISOString();
         } catch {
             error = "Could not load pending statuses";
@@ -169,6 +178,19 @@
                 {/each}
             </section>
         {/if}
+
+        {#if recentJobs.length > 0}
+            <section class="card">
+                <strong>recently finished</strong>
+                <div class="error-list recent-list">
+                    {#each recentJobs as recent}
+                        <p>
+                            [{formatDate(recent.updatedAt)}] {recent.service || $t("pending.unknown")} - {recent.filename || recent.id} - {recent.state}
+                        </p>
+                    {/each}
+                </div>
+            </section>
+        {/if}
     </main>
 </div>
 
@@ -257,6 +279,10 @@
         margin: 0;
         font-size: 12px;
         color: var(--gray);
+    }
+
+    .recent-list p {
+        color: var(--secondary);
     }
 
     .card.error {

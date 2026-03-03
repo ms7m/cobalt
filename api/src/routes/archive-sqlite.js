@@ -225,6 +225,7 @@ export const setupArchiveRoutes = (app) => {
                 res.setHeader('Accept-Ranges', 'bytes');
                 res.setHeader('Content-Length', end - start + 1);
                 res.setHeader('Content-Type', contentType);
+                res.setHeader('Content-Disposition', `inline; filename="${entry.filename}"`);
 
                 createReadStream(filePath, { start, end }).pipe(res);
                 return;
@@ -234,6 +235,7 @@ export const setupArchiveRoutes = (app) => {
             res.setHeader('Content-Type', contentType);
             res.setHeader('Content-Length', stats.size);
             res.setHeader('Accept-Ranges', 'bytes');
+            res.setHeader('Content-Disposition', `inline; filename="${entry.filename}"`);
             createReadStream(filePath).pipe(res);
         } catch {
             res.status(404).json({

@@ -129,7 +129,7 @@
                                 {formatBytes(job.progress.bytesDownloaded)} / {formatBytes(job.progress.bytesTotal)}
                             </span>
                         {:else if job.state === "running"}
-                            <span class="progress-text">processing...</span>
+                            <span class="progress-text">{formatBytes(job.progress.bytesDownloaded)} downloaded</span>
                         {/if}
                     {/if}
 

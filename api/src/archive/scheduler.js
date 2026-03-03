@@ -246,6 +246,7 @@ const downloadAndArchive = async (job, result, signal) => {
     let url = result.url;
     let filename = result.filename;
     let headers = result.headers || {};
+    let coverURL = job.request?.cover || null;
     let dispatcher = agent;
     let cleanupLink = null;
 
@@ -255,6 +256,7 @@ const downloadAndArchive = async (job, result, signal) => {
         headers = { ...headers, ...directSource.headers };
         dispatcher = directSource.dispatcher || agent;
         cleanupLink = directSource.cleanupLink;
+        coverURL = directSource.coverURL || coverURL;
 
         verboseLog("Resolved tunnel to direct source", {
             id: job.id,
@@ -316,9 +318,7 @@ const downloadAndArchive = async (job, result, signal) => {
                     downloadedBytes += value.length;
                     progressStream.push(value);
 
-                    if (totalBytes) {
-                        await setJobProgress(job.id, downloadedBytes, totalBytes);
-                    }
+                    await setJobProgress(job.id, downloadedBytes, totalBytes);
                 }
             } catch (error) {
                 progressStream.destroy(error);
@@ -329,7 +329,7 @@ const downloadAndArchive = async (job, result, signal) => {
 
         const service = job.service || "unknown";
         const archived = await archiveStream(service, filename, progressStream, mimeType, {
-            cover: job.request?.cover,
+            cover: coverURL,
         });
 
         if (!archived) {
@@ -443,6 +443,7 @@ const resolveTunnelToDirectSource = async (tunnelURL) => {
         headers: internal.headers ? Object.fromEntries(internal.headers) : {},
         dispatcher: internal.dispatcher,
         cleanupLink: internalLink,
+        coverURL: streamInfo.cover || null,
     };
 };
 
