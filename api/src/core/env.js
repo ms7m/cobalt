@@ -9,6 +9,28 @@ import { Green, Yellow } from "../misc/console-text.js";
 
 const youtubeHlsOptions = ["never", "key", "always"];
 
+const parsePositiveInt = (value, fallback) => {
+    const parsed = value && parseInt(value, 10);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+};
+
+const parseRateLimitMax = (value, fallback) => {
+    if (value === undefined || value === null || value === "") {
+        return fallback;
+    }
+
+    const parsed = parseInt(value, 10);
+    if (!Number.isFinite(parsed)) {
+        return fallback;
+    }
+
+    if (parsed <= 0) {
+        return Number.MAX_SAFE_INTEGER;
+    }
+
+    return parsed;
+};
+
 const httpProxyVariables = ["NO_PROXY", "HTTP_PROXY", "HTTPS_PROXY"].flatMap(
     k => [ k, k.toLowerCase() ]
 );
@@ -71,21 +93,31 @@ export const loadEnvs = (env = process.env) => {
 
         cookiePath: env.COOKIE_PATH,
 
-        rateLimitWindow: (env.RATELIMIT_WINDOW && parseInt(env.RATELIMIT_WINDOW)) || 60,
-        rateLimitMax: (env.RATELIMIT_MAX && parseInt(env.RATELIMIT_MAX)) || 20,
+        rateLimitWindow: parsePositiveInt(env.RATELIMIT_WINDOW, 60),
+        rateLimitMax: parseRateLimitMax(env.RATELIMIT_MAX, 20),
 
-        tunnelRateLimitWindow: (env.TUNNEL_RATELIMIT_WINDOW && parseInt(env.TUNNEL_RATELIMIT_WINDOW)) || 60,
-        tunnelRateLimitMax: (env.TUNNEL_RATELIMIT_MAX && parseInt(env.TUNNEL_RATELIMIT_MAX)) || 40,
+        tunnelRateLimitWindow: parsePositiveInt(env.TUNNEL_RATELIMIT_WINDOW, 60),
+        tunnelRateLimitMax: parseRateLimitMax(env.TUNNEL_RATELIMIT_MAX, 40),
 
-        sessionRateLimitWindow: (env.SESSION_RATELIMIT_WINDOW && parseInt(env.SESSION_RATELIMIT_WINDOW)) || 60,
+        sessionRateLimitWindow: parsePositiveInt(env.SESSION_RATELIMIT_WINDOW, 60),
         sessionRateLimit:
             // backwards compatibility with SESSION_RATELIMIT
             // till next major due to an error in docs
-            (env.SESSION_RATELIMIT_MAX && parseInt(env.SESSION_RATELIMIT_MAX))
-            || (env.SESSION_RATELIMIT && parseInt(env.SESSION_RATELIMIT))
-            || 10,
+            parseRateLimitMax(
+                env.SESSION_RATELIMIT_MAX ?? env.SESSION_RATELIMIT,
+                10
+            ),
 
-        durationLimit: (env.DURATION_LIMIT && parseInt(env.DURATION_LIMIT)) || 10800,
+        durationLimit: (() => {
+            const parsed = env.DURATION_LIMIT && parseInt(env.DURATION_LIMIT, 10);
+
+            // Unset, invalid, or non-positive value means no duration cap.
+            if (!parsed || parsed <= 0) {
+                return Number.POSITIVE_INFINITY;
+            }
+
+            return parsed;
+        })(),
         streamLifespan: (env.TUNNEL_LIFESPAN && parseInt(env.TUNNEL_LIFESPAN)) || 90,
 
         processingPriority: process.platform !== 'win32'

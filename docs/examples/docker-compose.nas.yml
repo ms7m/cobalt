@@ -46,8 +46,11 @@ services:
       # Optional: Cookie support for authenticated downloads
       # COOKIE_PATH: "/config/cookies.json"
       
-      # Optional: Duration limit in seconds (default: 10800 = 3 hours)
-      # DURATION_LIMIT: "10800"
+      # NAS defaults: disable duration and request caps for trusted LAN use
+      DURATION_LIMIT: "0"
+      RATELIMIT_MAX: "0"
+      SESSION_RATELIMIT_MAX: "0"
+      TUNNEL_RATELIMIT_MAX: "0"
       
       # Optional: Number of worker processes
       # API_INSTANCE_COUNT: "2"

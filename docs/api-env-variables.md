@@ -35,7 +35,7 @@ this document is not final and will expand over time. feel free to improve it!
 ### limit vars
 | name                     | default | value example |
 |:-------------------------|:--------|:--------------|
-| DURATION_LIMIT           | `10800` | `18000`       |
+| DURATION_LIMIT           |         | `18000`       |
 | TUNNEL_LIFESPAN          | `90`    | `120`         |
 | RATELIMIT_WINDOW         | `60`    | `120`         |
 | RATELIMIT_MAX            | `20`    | `30`          |
@@ -170,6 +170,8 @@ the value is an IPv6 range.
 ### DURATION_LIMIT
 media duration limit, in **seconds**
 
+if unset, invalid, or set to a non-positive value, no duration cap is applied.
+
 the value is a number.
 
 ### TUNNEL_LIFESPAN
@@ -187,6 +189,8 @@ the value is a number.
 ### RATELIMIT_MAX
 amount of api requests to be allowed within the time window of `RATELIMIT_WINDOW`.
 
+if set to a non-positive value, this limit is effectively disabled.
+
 the value is a number.
 
 ### SESSION_RATELIMIT_WINDOW
@@ -197,6 +201,8 @@ the value is a number.
 ### SESSION_RATELIMIT_MAX
 amount of session requests to be allowed within the time window of `SESSION_RATELIMIT_WINDOW`.
 
+if set to a non-positive value, this limit is effectively disabled.
+
 the value is a number.
 
 ### TUNNEL_RATELIMIT_WINDOW
@@ -206,6 +212,8 @@ the value is a number.
 
 ### TUNNEL_RATELIMIT_MAX
 amount of tunnel requests to be allowed within the time window of `TUNNEL_RATELIMIT_WINDOW`.
+
+if set to a non-positive value, this limit is effectively disabled.
 
 the value is a number.
 

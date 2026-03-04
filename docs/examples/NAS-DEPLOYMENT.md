@@ -124,7 +124,7 @@ Now all SoundCloud downloads go to `/archive/music/` instead of `/archive/soundc
 | `ARCHIVE_CONFIG_PATH` | `/config/archive-config.json` | Archive settings file |
 | `ARCHIVE_INDEX_DB` | `/config/archive-index.db` | Download history and thumbnails (SQLite) |
 | `ARCHIVE_JOBS_DB` | `/config/archive-jobs.db` | Background jobs database (SQLite) |
-| `DURATION_LIMIT` | `10800` | Max video duration (seconds) |
+| `DURATION_LIMIT` | `0` | Max video duration (seconds), `0` disables cap |
 | `API_INSTANCE_COUNT` | `1` | Number of worker processes |
 
 ### Web Variables

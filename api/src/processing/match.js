@@ -297,8 +297,10 @@ export default async function({ host, patternMatch, params, authType }) {
             let context;
             switch(r.error) {
                 case "content.too_long":
-                    context = {
-                        limit: parseFloat((env.durationLimit / 60).toFixed(2)),
+                    if (Number.isFinite(env.durationLimit)) {
+                        context = {
+                            limit: parseFloat((env.durationLimit / 60).toFixed(2)),
+                        }
                     }
                     break;
 
